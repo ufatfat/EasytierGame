@@ -1,18 +1,21 @@
 import { acceptHMRUpdate, defineStore } from "pinia";
 
-
-
 const store = defineStore("main", {
 	state() {
 		return {
+			networkRunning: false,
+			themeMode: "system" as "system" | "light" | "dark",
+			lobby: { roomId: "", autoRemove: true, hideWhenFull: false, connectionSnapshot: "" },
+			coordinator: { urls: [] as string[], activeUrl: "", url: "", serviceToken: "", clientToken: "", useRegisteredIp: false },
 			config: {
-				protocol: ["tcp"], // 网络协议
+				protocol: ["tcp"],
+				peerUrls: [] as string[], // 网络协议
 				serverUrl: ["public.easytier.top:11010"],
 				networkName: "",
 				networkPassword: "",
 				hostname: "",
 				ipv4: "",
-				ipv6:"",
+				ipv6: "",
 				tcpWhitelistEnable: false, // tcp端口白名单
 				udpWhitelistEnable: false, // udp端口白名单
 				tcpWhitelist: "", // tcp端口白名单
@@ -59,7 +62,7 @@ const store = defineStore("main", {
 				privateMode: false, //是否启用私有模式
 
 				enablePortForward: false, //是否启用端口转发
-				portForwardData: "", //端口转发数据
+				portForwardData: "" //端口转发数据
 			},
 			serverConfig: {
 				enableWhiteList: true, // 是否启用白名单
@@ -72,7 +75,7 @@ const store = defineStore("main", {
 				privateNetworkName: "", // 私有模式房间名
 				privateNetworkPassword: "", // 私有模式密码
 				ipv6PublicAddrProvider: false, //公网IPv6地址前缀提供
-				disableRelayData: false, //禁用Relay数据转发
+				disableRelayData: false //禁用Relay数据转发
 			},
 			cidrEnable: false,
 			proxyForwardBySystem: false, // 是否通过系统内核转发子网代理数据包，禁用内置NAT
@@ -100,7 +103,9 @@ const store = defineStore("main", {
 	persist: {
 		// 防止持久化保存 用户使用config.json输入的无用的字段
 		pick: [
+			"coordinator",
 			"config.protocol",
+			"config.peerUrls",
 			"config.serverUrl",
 			"config.networkName",
 			"config.networkPassword",
@@ -150,7 +155,6 @@ const store = defineStore("main", {
 			"config.enableQuicProxy",
 			"config.disableQuicInput",
 
-
 			"config.bindDeviceEnable",
 
 			"config.acceptDNS",
@@ -179,6 +183,8 @@ const store = defineStore("main", {
 			"proxyForwardBySystem",
 			"basePeers",
 			"theme",
+			"themeMode",
+			"lobby",
 			"configStartEnable",
 			"configPath",
 			"winIpBcAutoStart",
@@ -190,7 +196,7 @@ const store = defineStore("main", {
 			"forceBindInput",
 			"forceBindFile",
 			"latestTagName",
-			
+
 			"gameList"
 		]
 		// // 除了这些，其他都要存下来

@@ -1,30 +1,50 @@
+mod coordinator;
+mod platform;
+mod runtime;
+#[cfg(not(windows))]
+use platform::{
+    allow_sleep, autostart_is_enabled, get_network_adapter_guids, prevent_sleep, spawn_autostart,
+};
+use platform::{CommandVisibility, TokioCommandVisibility};
 use reqwest::{Client, Error};
 // use futures_util::StreamExt;
-use serde::{Deserialize};
+use serde::Deserialize;
 // use std::collections::HashMap;
 use std::fs::{self, File};
-use std::io::{BufRead, BufReader, Write};
-use std::os::windows::process::CommandExt;
-use std::process::{Command, Stdio};
+use std::io::Write;
+use std::path;
+use std::process::Command;
+#[cfg(windows)]
 use std::ptr;
+#[cfg(windows)]
 use std::sync::mpsc;
-use std::{path, thread};
+#[cfg(windows)]
+use std::thread;
 use sysinfo::System;
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::Emitter;
 use tauri::Manager;
+#[cfg(windows)]
 use windows::core::{Interface, BSTR};
+#[cfg(windows)]
 use windows::Win32::Foundation::VARIANT_BOOL;
+#[cfg(windows)]
 use windows::Win32::NetworkManagement::IpHelper::{
     GetAdaptersAddresses, GAA_FLAG_INCLUDE_PREFIX, IP_ADAPTER_ADDRESSES_LH,
 };
+#[cfg(windows)]
 use windows::Win32::Networking::WinSock::AF_UNSPEC;
+#[cfg(windows)]
 use windows::Win32::System::Com::*;
+#[cfg(windows)]
 use windows::Win32::System::TaskScheduler::*;
+#[cfg(windows)]
 use windows::Win32::System::Variant::VARIANT;
 // use std::ffi::CStr;
 
+#[cfg(windows)]
 use windows::Win32::System::Power::SetThreadExecutionState;
+#[cfg(windows)]
 use windows::Win32::System::Power::{
     ES_CONTINUOUS, ES_DISPLAY_REQUIRED, ES_SYSTEM_REQUIRED, EXECUTION_STATE,
 };
@@ -32,6 +52,7 @@ use windows::Win32::System::Power::{
 use rand::Rng;
 use tokio::process::Command as tokioCommand;
 
+#[cfg(windows)]
 #[tauri::command(rename_all = "snake_case")]
 fn get_network_adapter_guids() -> Vec<[String; 2]> {
     let mut guids: Vec<[String; 2]> = Vec::new();
@@ -102,6 +123,7 @@ fn generate_random_user_agent() -> String {
     template.replace("{version}", &version)
 }
 
+#[cfg(windows)]
 #[tauri::command(rename_all = "snake_case")]
 fn prevent_sleep() -> bool {
     unsafe {
@@ -111,6 +133,7 @@ fn prevent_sleep() -> bool {
     }
 }
 
+#[cfg(windows)]
 #[tauri::command(rename_all = "snake_case")]
 fn allow_sleep() -> bool {
     unsafe {
@@ -199,7 +222,7 @@ fn get_core_version() -> String {
     let core_path = get_tool_exe_path("\\easytier\\easytier-core.exe");
     match Command::new(&core_path)
         .arg("--version")
-        .creation_flags(0x08000000)
+        .hide_console()
         .output()
     {
         Ok(output) => {
@@ -219,7 +242,7 @@ fn get_core_version() -> String {
 //     let cli_path = get_tool_exe_path("\\easytier\\easytier-cli.exe");
 //     match Command::new(&cli_path)
 //         .arg("--version")
-//         .creation_flags(0x08000000)
+//         .hide_console()
 //         .output()
 //     {
 //         Ok(output) => {
@@ -230,13 +253,9 @@ fn get_core_version() -> String {
 //     }
 // }
 
-fn get_tool_exe_path(path: &str) -> String {
-    let cur_vec = get_exe_directory();
-    let tool_path = format!("{}{}", cur_vec[1].as_str(), path);
-    // log::error!("tool path: {}", tool_path);
-    return tool_path;
+fn get_tool_exe_path(relative: &str) -> String {
+    platform::tool_path(relative).to_string_lossy().into_owned()
 }
-
 
 #[tauri::command(rename_all = "snake_case")]
 async fn get_members_by_cli() -> String {
@@ -246,7 +265,8 @@ async fn get_members_by_cli() -> String {
         .arg("json")
         .arg("peer")
         .arg("list")
-        .creation_flags(0x08000000)
+        .hide_console()
+        .kill_on_drop(true)
         .output()
         .await
     {
@@ -269,12 +289,13 @@ async fn get_members_by_cli() -> String {
 
 #[tauri::command(rename_all = "snake_case")]
 async fn get_members_proxy() -> String {
-     let cli_path = get_tool_exe_path("\\easytier\\easytier-cli.exe");
+    let cli_path = get_tool_exe_path("\\easytier\\easytier-cli.exe");
     match tokioCommand::new(&cli_path)
         .arg("-o")
         .arg("json")
         .arg("proxy")
-        .creation_flags(0x08000000)
+        .hide_console()
+        .kill_on_drop(true)
         .output()
         .await
     {
@@ -303,7 +324,8 @@ async fn get_members_connections_cli() -> String {
         .arg("-o")
         .arg("json")
         .arg("peer")
-        .creation_flags(0x08000000)
+        .hide_console()
+        .kill_on_drop(true)
         .output()
         .await
     {
@@ -331,7 +353,8 @@ async fn get_route_by_cli() -> String {
         .arg("-o")
         .arg("json")
         .arg("route")
-        .creation_flags(0x08000000)
+        .hide_console()
+        .kill_on_drop(true)
         .output()
         .await
     {
@@ -355,9 +378,12 @@ async fn get_route_by_cli() -> String {
 #[tauri::command(rename_all = "snake_case")]
 async fn fetch_nodes_list(page: u64, limit: u64) -> String {
     let client = Client::new();
-    let url = format!("https://uptime.easytier.cn/api/nodes?page={}&per_page={}", page, limit);
+    let url = format!(
+        "https://uptime.easytier.cn/api/nodes?page={}&per_page={}",
+        page, limit
+    );
     let user_agent = generate_random_user_agent();
-    
+
     match client
         .get(url)
         .header("User-Agent", user_agent)
@@ -375,7 +401,10 @@ async fn fetch_nodes_list(page: u64, limit: u64) -> String {
                 }
             } else {
                 log::error!("HTTP request failed with status: {}", response.status());
-                format!("_EasytierGameFetchNodesError_: HTTP request failed with status: {}", response.status())
+                format!(
+                    "_EasytierGameFetchNodesError_: HTTP request failed with status: {}",
+                    response.status()
+                )
             }
         }
         Err(e) => {
@@ -392,7 +421,10 @@ async fn download_easytier_zip(
     file_name: String,
 ) {
     let cache_dir_path = get_tool_exe_path("\\easytier\\cache");
-    let cache_file_name = format!("{}\\{}", cache_dir_path, file_name);
+    let cache_file_name = path::Path::new(&cache_dir_path)
+        .join(&file_name)
+        .to_string_lossy()
+        .into_owned();
     let cache_file_name_path = path::Path::new(&cache_file_name);
     if cache_file_name_path.exists() {
         unzip(cache_file_name_path);
@@ -404,7 +436,10 @@ async fn download_easytier_zip(
         .await
         .expect("error to download easytier url");
     let easytier_path = get_tool_exe_path("\\easytier");
-    let file_path = format!("{}\\{}", easytier_path, file_name);
+    let file_path = path::Path::new(&easytier_path)
+        .join(&file_name)
+        .to_string_lossy()
+        .into_owned();
     // println!("download easytier to {}", file_path);
 
     let easytier_dir = path::Path::new(&easytier_path);
@@ -466,6 +501,9 @@ fn unzip(fname: &path::Path) {
 
     for i in 0..archive.len() {
         let mut file = archive.by_index(i).unwrap();
+        if file.is_dir() {
+            continue;
+        }
         let outpath = match file.enclosed_name() {
             Some(path) => path,
             None => continue,
@@ -500,93 +538,28 @@ fn unzip(fname: &path::Path) {
         println!("outFilePath: {}", out_file_path.display());
         let mut outfile = fs::File::create(&out_file_path).unwrap();
         std::io::copy(&mut file, &mut outfile).unwrap();
+        platform::make_executable(&out_file_path);
     }
 }
 
 #[tauri::command(rename_all = "snake_case")]
-fn run_command(app_handle: tauri::AppHandle, args: Vec<String>, is_server: Option<bool>) {
-    let is_server = is_server.unwrap_or(false);
-    let (tx, rx) = mpsc::channel();
-
-    let app_handle1 = app_handle.clone();
-    let app_handle2 = app_handle.clone();
-
-    let args2 = args.clone();
-    let mut thread_id_str = "thread-id";
-    if is_server {
-        thread_id_str = "server-thread-id";
-    }
-    let mut command_output_str = "command-output";
-    if is_server {
-        command_output_str = "server-command-output";
-    }
-    thread::spawn(move || {
-        let core_path = get_tool_exe_path("\\easytier\\easytier-core.exe");
-        // trace, debug, info, warn, error, off
-        let mut child = Command::new(&core_path)
-            .args(args)
-            .creation_flags(0x08000000)
-            .stdout(Stdio::piped())
-            .spawn()
-            .expect("failed to execute process");
-
-        println!("child id: {}", child.id());
-        app_handle1
-            .emit(thread_id_str, child.id())
-            .expect("failed to emit id event");
-        app_handle1
-            .emit(command_output_str, args2.join(" "))
-            .expect("error output args");
-        let stdout = child.stdout.take().expect("failed to capture stdout");
-        let reader = BufReader::new(stdout);
-
-        for line in reader.lines() {
-            match line {
-                Ok(line) => match tx.send(line) {
-                    Ok(_) => {}
-                    Err(e) => {
-                        log::error!("error sending line: {}", e);
-                        break;
-                    }
-                },
-                Err(e) => {
-                    log::error!("error reading line: {}", e);
-                    break;
-                }
-            }
-        }
-        println!("end");
-    });
-
-    thread::spawn(move || {
-        while let Ok(line) = rx.recv() {
-            app_handle2
-                .emit(command_output_str, line)
-                .expect("failed to emit event");
-        }
-    });
+async fn run_command(
+    app_handle: tauri::AppHandle,
+    args: Vec<String>,
+    is_server: Option<bool>,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        platform::start_core(app_handle, args, is_server.unwrap_or(false))
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command(rename_all = "snake_case")]
-fn stop_command(child_id: u32) {
-    if child_id != 0 {
-        let output = Command::new("taskkill")
-            .arg("/F")
-            .arg("/PID") // 使用 -9 信号强制终止进程
-            .arg(child_id.to_string())
-            .creation_flags(0x08000000)
-            .output()
-            .expect("Failed to execute command");
-
-        // 检查命令执行的结果
-        if output.status.success() {
-            println!("Process {} terminated successfully.", child_id);
-        } else {
-            eprintln!("Failed to terminate process {}.", child_id);
-        }
-    } else {
-        println!("child id is 0");
-    }
+async fn stop_command(child_id: u32) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || platform::stop_core(child_id))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -597,7 +570,7 @@ async fn fetch_easytier_list() -> Vec<Vec<[String; 4]>> {
         for re in release {
             let mut assets_list: Vec<[String; 4]> = Vec::new();
             for asset in re.assets {
-                if asset.name.contains("windows-x86_64") {
+                if asset.name.contains(platform::release_target()) && asset.name.ends_with(".zip") {
                     assets_list.push([
                         re.tag_name.clone(),
                         asset.name.clone(),
@@ -664,6 +637,7 @@ fn get_exe_directory() -> Vec<String> {
     };
 }
 
+#[cfg(windows)]
 #[tauri::command]
 fn spawn_autostart(enabled: bool) {
     let (tx, rx) = mpsc::channel();
@@ -686,6 +660,7 @@ fn spawn_autostart(enabled: bool) {
     }
 }
 
+#[cfg(windows)]
 fn autostart_enabled() -> Result<bool, Box<dyn std::error::Error>> {
     unsafe {
         let task_service: ITaskService = CoCreateInstance(&TaskScheduler, None, CLSCTX_ALL)?;
@@ -717,6 +692,7 @@ fn autostart_enabled() -> Result<bool, Box<dyn std::error::Error>> {
     }
 }
 
+#[cfg(windows)]
 #[tauri::command]
 fn autostart_is_enabled() -> bool {
     match autostart_enabled() {
@@ -732,6 +708,7 @@ fn autostart_is_enabled() -> bool {
 }
 
 // 新增辅助函数
+#[cfg(windows)]
 fn ensure_task_folder_and_cleanup(
     task_service: &ITaskService,
     folder_path: &BSTR,
@@ -777,6 +754,7 @@ fn ensure_task_folder_and_cleanup(
 
 // pub const AUTOSTART_ARG: &str = "--autostart";
 pub const TASKAUTOSTART_ARG: &str = "--task-auto-start";
+#[cfg(windows)]
 fn autostart(enabled: bool) -> std::result::Result<(), Box<dyn std::error::Error>> {
     if !enabled {
         unsafe {
@@ -884,6 +862,22 @@ pub fn run() {
     let _args: Vec<String> = std::env::args().collect();
 
     let context = tauri::generate_context!();
+    // Keep the shared Windows configuration unchanged. Configure native macOS chrome
+    // before static windows are created, including development and custom-config builds.
+    #[cfg(target_os = "macos")]
+    let context = {
+        let mut context = context;
+        for window in &mut context.config_mut().app.windows {
+            window.decorations = true;
+            window.title_bar_style = tauri::TitleBarStyle::Overlay;
+            window.hidden_title = true;
+            window.traffic_light_position =
+                Some(tauri::utils::config::LogicalPosition { x: 16.0, y: 18.0 });
+            window.minimizable = true;
+            window.maximizable = true;
+        }
+        context
+    };
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_cli::init())
@@ -903,6 +897,8 @@ pub fn run() {
                 .expect("failed to set focus");
         }))
         .setup(move |app| {
+            platform::initialize(app.handle())?;
+            runtime::start(app.handle().clone());
             // let args = args.clone();
             // if cfg!(debug_assertions) {
             let log_path = get_tool_exe_path("\\easytier\\guiLogs");
@@ -948,7 +944,20 @@ pub fn run() {
 
             Ok(())
         })
+        .on_window_event(|window, event| {
+            if matches!(event, tauri::WindowEvent::Destroyed) {
+                runtime::remove_window(window.label());
+            }
+        })
         .invoke_handler(tauri::generate_handler![
+            runtime::get_runtime_snapshot,
+            runtime::get_log_snapshot,
+            runtime::set_runtime_subscription,
+            platform::get_platform,
+            platform::is_core_running,
+            coordinator::coordinator_request,
+            coordinator::get_network_snapshot,
+            coordinator::probe_server,
             run_command,
             stop_command,
             get_core_version,
@@ -968,6 +977,11 @@ pub fn run() {
             allow_sleep,
             get_network_adapter_guids
         ])
-        .run(context)
-        .expect("error while running tauri application");
+        .build(context)
+        .expect("error while building tauri application")
+        .run(|_app, event| {
+            if matches!(event, tauri::RunEvent::Exit) {
+                platform::stop_all();
+            }
+        });
 }

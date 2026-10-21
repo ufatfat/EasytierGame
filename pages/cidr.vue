@@ -1,5 +1,11 @@
 <template>
 	<div class="flex h-full flex-col gap-[10px]">
+		<PanelHeader
+			v-if="usesNativeWindowControls"
+			icon="network"
+			title="子网代理"
+			subtitle="配置通过虚拟网络共享的局域网网段"
+		/>
 		<div class="flex items-center gap-[10px]">
 			<ElRadioGroup
 				:disabled="!data.isSwitchEnable"
@@ -50,65 +56,15 @@
 	</div>
 </template>
 <script setup lang="ts">
-	import useMainStore from "@/stores/index";
+	import PanelHeader from "@/components/PanelHeader.vue";
+	import { usesNativeWindowControls } from "@/composables/platform";
+	import useMainStore from "@/stores";
 	import { dataSubscribe } from "@/composables/windows";
-	import { invoke } from "@tauri-apps/api/core";
-	import { reactive, onMounted, onBeforeUnmount } from "vue";
-	import { ATJ, parseCliInfo } from "@/utils";
-	import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-	const mainStore = useMainStore();
-
-	const data = reactive<{ [key: string]: any }>({
-		route: [],
-		isStart: false,
-		isSwitchEnable: false,
-		isRunning: false
-	});
-
-	const listenOutput = async () => {
-		data.isRunning = true;
-		const [error, member] = await ATJ(invoke<string>("get_route_by_cli"));
-		data.isRunning = false;
-		if(!member) return;
-		if (error) {
-			data.route = [];
-			return "";
-		}
-		if (member === "_EasytierGameCliFailedToConnect_") {
-			data.route = [];
-			await listenOutput();
-			return;
-		}
-		data.route = JSON.parse(member);
-	};
-
-	const listenStart = async () => {
-		const unListen = await listen<boolean>("route", async event => {
-			data.isStart = event.payload;
-			if (data.isStart) {
-				data.isSwitchEnable = false;
-				if (mainStore.cidrEnable && !data.isRunning) {
-					await listenOutput();
-				} else {
-					data.route = [];
-				}
-			} else {
-				data.isSwitchEnable = true;
-				data.route = [];
-			}
-		});
-		return unListen;
-	};
-
-	let unlistenStart: UnlistenFn | null = null;
-
-	onMounted(async () => {
-		unlistenStart = await listenStart();
-	});
-
+	import { useRuntimeNetwork } from "@/composables/runtime";
+	import { computed } from "vue";
+	import CoreVersionWarning from "@/components/CoreVersionWarning.vue";
+	const mainStore = useMainStore(),
+		runtime = useRuntimeNetwork("routes");
+	const data = computed(() => ({ route: mainStore.cidrEnable ? runtime.value.routes : [], isSwitchEnable: !runtime.value.client_running }));
 	dataSubscribe();
-
-	onBeforeUnmount(() => {
-		unlistenStart && unlistenStart();
-	});
 </script>

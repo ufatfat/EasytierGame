@@ -1,24 +1,22 @@
+import { isTauri } from "@tauri-apps/api/core";
 import { type UnlistenFn } from "@tauri-apps/api/event";
-import { getCurrentWindow, PhysicalPosition, type WindowOptions, Window, currentMonitor, PhysicalSize } from "@tauri-apps/api/window";
+import { getCurrentWindow, PhysicalPosition, type WindowOptions, Window, currentMonitor, LogicalPosition } from "@tauri-apps/api/window";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import type { WebviewLabel, WebviewOptions } from "@tauri-apps/api/webview";
+import { usesNativeWindowControls } from "./platform";
 import useMainStore from "@/stores/index";
-import { onBeforeUnmount } from "vue";
+import { onBeforeUnmount, watch } from "vue";
 import { updateConfigJsonBounce, type ConfigServerUrlType } from "./configJson";
 
-const _listenersMaps: { [key: string]: [UnlistenFn | null] } = {};
-
+const _listenersMaps = new Map<string, UnlistenFn>();
 const dealCloseListener = async (dialog: WebviewWindow, label: string, beforeCloseFunc?: () => void | null) => {
-	const unlistenFnList: [UnlistenFn | null] = _listenersMaps[label] || [null];
-	let [unListenlogClose] = unlistenFnList;
-
-	unListenlogClose && (await unListenlogClose());
-
-	unListenlogClose = await dialog.onCloseRequested(async () => {
-		beforeCloseFunc && (await beforeCloseFunc());
-		unListenlogClose && (await unListenlogClose());
-		console.log("close");
+	_listenersMaps.get(label)?.();
+	const off = await dialog.onCloseRequested(async () => {
+		await beforeCloseFunc?.();
+		_listenersMaps.get(label)?.();
+		_listenersMaps.delete(label);
 	});
+	_listenersMaps.set(label, off);
 };
 export default async (
 	label: WebviewLabel,
@@ -26,36 +24,65 @@ export default async (
 	afterCreatedFunc?: (webviewWindow: WebviewWindow, appWindow: Window) => void | null,
 	beforeCloseFunc?: () => void | null
 ) => {
-	const unlistenFnList: [UnlistenFn | null] = _listenersMaps[label] || [null];
+	if (!isTauri()) {
+		window.location.hash = String(options?.url || `#/${label}`).replace(/^#/, "");
+		return;
+	}
 	let dialog = await WebviewWindow.getByLabel(label);
 	if (!dialog) {
 		let defaultOpts: { [key: string]: any; parent: Window | undefined } = {
 			parent: undefined,
+			// macOS: the first click should activate the window and operate the control.
+			acceptFirstMouse: true,
 			closable: true,
 			resizable: true,
-			decorations: true,
+			decorations: false,
 			maximizable: false,
 			minimizable: false,
 			x: 0,
 			y: 0
 		};
-		const appWindow = getCurrentWindow();
-		if (appWindow) {
-			defaultOpts.parent = appWindow;
-			// console.error(logicalPosition);
-			if (defaultOpts.x == 0 && defaultOpts.y == 0) {
-				const logicalAppSize = {
-					width: 340,
-					height: 305
-				}
-				const factor = await appWindow.scaleFactor();
-				const appPosition = await appWindow.outerPosition();
-				const logicalPosition = new PhysicalPosition(appPosition.x + Math.ceil((logicalAppSize.width + 5) * factor), appPosition.y).toLogical(factor);
-				defaultOpts.x = logicalPosition.x;
-				defaultOpts.y = logicalPosition.y;
+		const appWindow = (await WebviewWindow.getByLabel("main")) || getCurrentWindow();
+		defaultOpts.parent = appWindow;
+		const factor = await appWindow.scaleFactor(),
+			appPosition = await appWindow.outerPosition(),
+			appSize = await appWindow.outerSize();
+		const monitor = await currentMonitor();
+		const opts = { ...options };
+		let x = appPosition.x + appSize.width + Math.ceil(12 * factor),
+			y = appPosition.y;
+		if (monitor) {
+			const area = monitor.workArea;
+			const width = Math.min(Number(opts.width || 600), area.size.width / factor),
+				height = Math.min(Number(opts.height || 720), area.size.height / factor);
+			opts.width = width;
+			opts.height = height;
+			opts.minWidth = Math.min(Number(opts.minWidth || 360), width);
+			opts.minHeight = Math.min(Number(opts.minHeight || 480), height);
+			x = Math.max(area.position.x, Math.min(x, area.position.x + area.size.width - width * factor));
+			y = Math.max(area.position.y, Math.min(y, area.position.y + area.size.height - height * factor));
+			const mainX = x - appSize.width - Math.ceil(12 * factor);
+			if (mainX >= area.position.x && x < appPosition.x + appSize.width) {
+				await appWindow.setPosition(new PhysicalPosition(mainX, appPosition.y));
 			}
 		}
-		dialog = new WebviewWindow(label, { ...defaultOpts, ...options });
+		const logical = new PhysicalPosition(x, y).toLogical(factor);
+		defaultOpts.x = logical.x;
+		defaultOpts.y = logical.y;
+		dialog = new WebviewWindow(label, {
+			...defaultOpts,
+			...opts,
+			...(usesNativeWindowControls
+				? {
+						decorations: true,
+						titleBarStyle: "overlay",
+						hiddenTitle: true,
+						trafficLightPosition: new LogicalPosition(16, 18),
+						minimizable: true,
+						maximizable: true
+					}
+				: {})
+		});
 		await dealCloseListener(dialog, label, beforeCloseFunc);
 		await dialog.show();
 		afterCreatedFunc && (await afterCreatedFunc(dialog, appWindow));
@@ -72,27 +99,23 @@ export default async (
 	}
 };
 
-export const dataSubscribe = async (cb?: any, getconfigServerUrl?: () => ConfigServerUrlType) => {
-	const mainStore = useMainStore();
-	const abort = new AbortController();
-
-	window.addEventListener(
-		"storage",
-		async () => {
-			// console.log("触发", {dhcp:mainStore.config.dhcp, c: mainStore.createConfigInEasytier})
-			mainStore.$hydrate();
-			const configServerUrl = getconfigServerUrl && getconfigServerUrl instanceof Function ? getconfigServerUrl() : null;
-			updateConfigJsonBounce(configServerUrl);
-			if (cb && cb instanceof Function) {
-				await cb();
-			}
-		},
-		{
-			signal: abort.signal
-		}
-	);
+export const dataSubscribe = (cb?: () => unknown, getconfigServerUrl?: () => ConfigServerUrlType) => {
+	const store = useMainStore();
+	const updated = () => {
+		if (cb) void cb();
+	};
+	window.addEventListener("etg:settings-updated", updated);
+	// Only the main window owns config.json writes; one debounced write for relevant edits.
+	const stop = getconfigServerUrl
+		? watch(
+				() => JSON.stringify([store.config, store.basePeers, store.createConfigInEasytier, getconfigServerUrl()]),
+				() => {
+					if (isTauri()) updateConfigJsonBounce(getconfigServerUrl());
+				}
+			)
+		: undefined;
 	onBeforeUnmount(() => {
-		console.log("取消监听");
-		abort?.abort();
+		window.removeEventListener("etg:settings-updated", updated);
+		stop?.();
 	});
 };

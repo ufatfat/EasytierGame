@@ -1,0 +1,16 @@
+{
+  "before": {
+    "js_bytes": 805542,
+    "js_gzip": 297897,
+    "css_bytes": 299544,
+    "js_chunks": 46
+  },
+  "after": {
+    "js_bytes": 719731,
+    "js_gzip": 266636,
+    "css_bytes": 298998,
+    "js_chunks": 43
+  },
+  "js_reduction_percent": 10.65,
+  "gzip_reduction_percent": 10.49
+}

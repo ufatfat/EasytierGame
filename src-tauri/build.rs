@@ -1,8 +1,12 @@
 fn main() {
+    #[cfg(all(windows, target_arch = "x86_64"))]
     thunk::thunk();
+    #[cfg(windows)]
     let mut windows = tauri_build::WindowsAttributes::new();
-    windows = windows.app_manifest(
-        r#"
+    #[cfg(windows)]
+    {
+        windows = windows.app_manifest(
+            r#"
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
   <dependency>
     <dependentAssembly>
@@ -25,7 +29,11 @@ fn main() {
   </trustInfo>
 </assembly>
 "#,
-    );
+        );
+    }
+    #[cfg(windows)]
     tauri_build::try_build(tauri_build::Attributes::new().windows_attributes(windows))
         .expect("failed to run build script");
+    #[cfg(not(windows))]
+    tauri_build::build();
 }

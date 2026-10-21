@@ -1,166 +1,225 @@
 <template>
-	<div class="h-full overflow-auto">
-		<div class="max-w-[2000px]">
-			<ElText
-				size="small"
-				v-if="!data.member || data.member.length <= 0"
+	<section class="panel-page">
+		<PanelHeader
+			icon="users"
+			title="房间信息"
+			:subtitle="`${store.config.networkName || '当前房间'} · ${data.member.filter(m => !isServer(m)).length} 位成员 · ${data.member.filter(isServer).length} 个服务器节点`"
+		>
+			<button
+				class="ui-button"
+				:disabled="refreshing"
+				@click="refresh"
 			>
-				{{ "等待成员信息中..." }}
-			</ElText>
-			<ElTable
-				stripe
-				border
-				:data="computedMember"
-				v-else
-			>
-				<ElTableColumn
-					sortable
-					label="成员名"
-					prop="hostname"
-				>
-					<template #default="{ row }">
-						<div :class="`whitespace-pre-wrap`">
-							<div>
-								{{
-									(row.hostname || "").toLowerCase().includes("publicserver")
-										? (row.hostname || "").replace("PublicServer", "服务器")
-										: row.hostname || "-"
-								}}
-							</div>
-							<div
-								class="space-y-1"
-								v-if="row?.connections_addrs?.length > 0"
-							>
-								<ElTag
-									:key="url"
-									v-for="url in row.connections_addrs"
-									class="!flex !h-auto !whitespace-pre-wrap !break-all !py-[5px]"
-								>
-									{{ url }}
-								</ElTag>
-							</div>
-						</div>
-					</template>
-				</ElTableColumn>
-				<ElTableColumn
-					sortable
-					width="70"
-					prop="cost"
-					label="方式"
-				>
-					<template #default="{ row }">
-						<ElTag
-							size="small"
-							effect="dark"
-							:type="row.cost == 'p2p' ? 'success' : 'info'"
-						>
-							{{ row.cost ? row.cost.replace("relay", "中转").replace("p2p", "直连") : row.cost }}
-						</ElTag>
-					</template>
-				</ElTableColumn>
-				<ElTableColumn
-					sortable
-					width="120"
-					prop="ipv4"
-					label="虚拟网IP"
-					:sort-method="sortIpv4"
-					:sort-orders="['ascending', 'descending', null]"
-				>
-					<template #default="{ row }">
-						<div class="space-y-[5px]">
-							<div>
-								{{ row.ipv4 || "-" }}
-							</div>
-							<div v-if="row.proxy?.[0]">
-								<ElTooltip :content="row.proxy?.[1] == 'Connected' ? '已连接' : '已断开'">
-									<ElTag
-										size="small"
-										:type="row.proxy?.[1] == 'Connected' ? 'success' : 'danger'"
-									>
-										{{ row.proxy?.[0] || "-" }}代理
-									</ElTag>
-								</ElTooltip>
-							</div>
-						</div>
-					</template>
-				</ElTableColumn>
-				<ElTableColumn
-					sortable
-					prop="lat_ms"
-					width="80"
-					label="延迟/ms"
-					:sort-method="sortLatMs"
-					:sort-orders="['ascending', 'descending', null]"
-				>
-					<template #default="{ row }">
-						{{ formatLatency(row.lat_ms) }}
-					</template>
-				</ElTableColumn>
-				<ElTableColumn
-					sortable
-					width="70"
-					prop="loss_rate"
-					label="丢包率"
-				>
-					<template #default="{ row }">
-						{{
-							row.loss_rate && row.loss_rate != "-"
-								? row.loss_rate.endsWith("%")
-									? row.loss_rate
-									: Number(row.loss_rate * 100).toFixed(2) + "%"
-								: row.loss_rate
-						}}
-					</template>
-				</ElTableColumn>
-				<ElTableColumn
-					sortable
-					width="100"
-					label="NAT类型"
-					prop="nat_type"
-				>
-					<template #default="{ row }">
-						{{ natMaps[row.nat_type.toLowerCase() as NATKyes] || row.nat_type || "-" }}
-					</template>
-				</ElTableColumn>
-				<ElTableColumn
-					sortable
-					width="122"
-					prop="version"
-					label="版本"
-				></ElTableColumn>
-				<ElTableColumn
-					sortable
-					width="100"
-					prop="tunnel_proto"
-					label="隧道协议"
-				></ElTableColumn>
-				<ElTableColumn
-					sortable
-					width="90"
-					prop="rx_bytes"
-					label="接收"
-					:sort-method="sortBytes"
-					:sort-orders="['ascending', 'descending', null]"
-				></ElTableColumn>
-				<ElTableColumn
-					sortable
-					prop="tx_bytes"
-					label="传输"
-					:sort-method="(a: any, b: any) => sortBytes(a, b, 'tx_bytes')"
-					:sort-orders="['ascending', 'descending', null]"
-				></ElTableColumn>
-			</ElTable>
+				<AppIcon
+					name="refresh"
+					:size="13"
+				/>
+				刷新
+			</button>
+		</PanelHeader>
+		<div class="member-summary">
+			<section class="surface-card">
+				<span>连接方式</span>
+				<strong class="mono">{{ directCount }} 直连 · {{ relayCount }} 中转</strong>
+				<small>P2P 打洞成功率 {{ directCount + relayCount ? Math.round((directCount / (directCount + relayCount)) * 100) : 0 }}%</small>
+			</section>
+			<section class="surface-card">
+				<span>平均延迟</span>
+				<strong class="mono text-success">{{ averageLatency }} ms</strong>
+				<small>越低越好 · 房间内</small>
+			</section>
+			<section class="surface-card">
+				<span>累计流量</span>
+				<strong class="mono">↓ {{ traffic.rx }}　↑ {{ traffic.tx }}</strong>
+				<small>实时统计</small>
+			</section>
 		</div>
-	</div>
+		<div class="section-toolbar member-filters">
+			<div class="segmented">
+				<button
+					v-for="item in [
+						{ value: 'all', label: '全部', count: data.member.length },
+						{ value: 'member', label: '成员', count: data.member.filter(m => !isServer(m)).length },
+						{ value: 'server', label: '服务器', count: data.member.filter(isServer).length }
+					]"
+					:key="item.value"
+					:class="{ active: filter === item.value }"
+					@click="filter = item.value"
+				>
+					{{ item.label }} {{ item.count }}
+				</button>
+			</div>
+			<span>每 2 秒自动刷新</span>
+		</div>
+		<div class="panel-content member-list">
+			<article
+				v-for="member in visibleMembers"
+				:key="member.id"
+				class="peer-card surface-card"
+				:class="{ local: member.cost === 'Local' }"
+			>
+				<button
+					class="peer-card-main"
+					@click="expanded = expanded === member.id ? '' : member.id"
+				>
+					<span class="avatar">
+						<AppIcon
+							v-if="isServer(member)"
+							name="server"
+							:size="16"
+						/>
+						<template v-else>{{ displayName(member).slice(0, 1) }}</template>
+					</span>
+					<div class="peer-identity">
+						<strong>
+							{{ displayName(member) }}
+							<small v-if="member.cost === 'Local'">本机</small>
+						</strong>
+						<span class="mono">{{ member.ipv4 || "—" }} · v{{ member.version?.replace(/^v/, "") || "—" }}</span>
+					</div>
+					<div class="peer-badges">
+						<span
+							class="ui-tag"
+							:class="member.cost === 'Local' ? 'primary' : isServer(member) ? '' : member.cost === 'p2p' ? 'success' : 'warning'"
+						>
+							<i class="dot" />
+							{{ member.cost === "Local" ? "本机" : isServer(member) ? "服务器" : member.cost === "p2p" ? "直连" : "中转" }}
+						</span>
+						<span class="ui-tag mono">{{ member.tunnel_proto || "—" }}</span>
+						<span class="ui-tag mono">{{ member.nat_type || "—" }}</span>
+					</div>
+					<div class="peer-quality">
+						<strong
+							class="mono"
+							:class="Number(member.lat_ms) < 50 ? 'text-success' : 'text-warning'"
+						>
+							{{ member.cost === "Local" ? "—" : `${formatLatency(member.lat_ms)} ms` }}
+						</strong>
+						<small v-if="member.cost !== 'Local'">丢包 {{ member.loss_rate || "0%" }}</small>
+					</div>
+					<AppIcon
+						name="chevron-down"
+						:size="12"
+						class="text-muted"
+					/>
+				</button>
+				<div
+					v-if="expanded === member.id"
+					class="peer-expanded"
+				>
+					<div>
+						<span>接收 / 发送</span>
+						<b class="mono">{{ member.rx_bytes || "—" }} / {{ member.tx_bytes || "—" }}</b>
+					</div>
+					<div>
+						<span>NAT / 协议</span>
+						<b class="mono">{{ member.nat_type || "—" }} / {{ member.tunnel_proto || "—" }}</b>
+					</div>
+					<div
+						v-for="address in member.connections_addrs"
+						:key="address"
+					>
+						<span>连接地址</span>
+						<b class="mono">{{ address }}</b>
+					</div>
+					<button
+						class="text-button"
+						@click="copyText(member.ipv4)"
+					>
+						<AppIcon
+							name="copy"
+							:size="12"
+						/>
+						复制虚拟 IP
+					</button>
+				</div>
+			</article>
+			<div
+				v-if="!visibleMembers.length"
+				class="empty-state"
+			>
+				<AppIcon
+					name="users"
+					:size="30"
+				/>
+				<p>等待成员信息，请先在主窗口启动联机</p>
+			</div>
+			<div class="subnet-heading">
+				<AppIcon
+					name="network"
+					:size="14"
+				/>
+				<span>子网代理</span>
+				<small>由成员共享的其他局域网网段</small>
+				<button
+					class="text-button"
+					@click="openCidr"
+				>
+					子网代理设置
+				</button>
+			</div>
+			<div
+				v-for="member in data.member.filter(m => m.cidr && m.cidr !== '-')"
+				:key="`subnet-${member.id}`"
+				class="subnet-route surface-card"
+			>
+				<span class="mono">{{ member.cidr }}</span>
+				<span>→ {{ displayName(member) }} · {{ member.ipv4 }}</span>
+			</div>
+		</div>
+	</section>
 </template>
 <script setup lang="ts">
-	import { invoke } from "@tauri-apps/api/core";
-	import { reactive, onMounted, onBeforeUnmount, computed } from "vue";
+	import AppIcon from "@/components/AppIcon.vue";
+	import PanelHeader from "@/components/PanelHeader.vue";
+	import openWindow from "@/composables/windows";
+	import { useRuntimeNetwork, refreshRuntimeNetwork } from "@/composables/runtime";
+	import useMainStore from "@/stores/index";
+	import { copyText } from "@/utils";
+	import { invoke, isTauri } from "@tauri-apps/api/core";
+	import { reactive, onMounted, onBeforeUnmount, computed, ref, watch } from "vue";
 	import { ATJ } from "@/utils";
 	import { ElConfirmDanger } from "~/utils/element";
 	import { getCurrentWindow } from "@tauri-apps/api/window";
 	import { isNaN } from "lodash-es";
 
+	const store = useMainStore();
+	const filter = ref("all"),
+		expanded = ref(""),
+		refreshing = ref(false);
+	const isServer = (member: Member) => /publicserver/i.test(member.hostname || "") || !member.ipv4 || member.ipv4 === "-";
+	const displayName = (member: Member) => (/publicserver/i.test(member.hostname || "") ? "服务器" : member.hostname || "未命名成员");
+	const visibleMembers = computed(() =>
+		computedMember.value.filter(member => filter.value === "all" || (filter.value === "server" ? isServer(member) : !isServer(member)))
+	);
+	const directCount = computed(() => data.member.filter(m => m.cost === "p2p").length);
+	const relayCount = computed(() => data.member.filter(m => m.cost !== "Local" && m.cost !== "p2p" && !isServer(m)).length);
+	const averageLatency = computed(() => {
+		const values = data.member
+			.filter(m => m.cost !== "Local" && !isServer(m) && Number.isFinite(Number(m.lat_ms)) && Number(m.lat_ms) >= 0)
+			.map(m => Number(m.lat_ms));
+		return values.length ? Math.round(values.reduce((a, b) => a + b, 0) / values.length) : "—";
+	});
+	const bytes = (value: string) => {
+		const match = String(value || "").match(/([\d.]+)\s*([kmgt]?)/i);
+		return match ? Number(match[1]) * 1024 ** Math.max(0, ["", "k", "m", "g", "t"].indexOf(match[2].toLowerCase())) : 0;
+	};
+	const traffic = computed(() => {
+		const rx = data.member.reduce((sum, m) => sum + bytes(m.rx_bytes), 0),
+			tx = data.member.reduce((sum, m) => sum + bytes(m.tx_bytes), 0);
+		const format = (n: number) => (n >= 1024 ** 3 ? `${(n / 1024 ** 3).toFixed(2)} GB` : `${(n / 1024 ** 2).toFixed(0)} MB`);
+		return { rx: format(rx), tx: format(tx) };
+	});
+	const refresh = async () => {
+		if (!isTauri()) return;
+		refreshing.value = true;
+		try {
+			await refreshRuntimeNetwork();
+		} finally {
+			refreshing.value = false;
+		}
+	};
+	const openCidr = () => openWindow("cidr", { url: "#/cidr", title: "子网代理", width: 600, height: 720 });
 	const natMaps = {
 		unknown: "未知",
 		OpenInternet: "nat0-openinternet",
@@ -336,84 +395,182 @@
 		return num.toFixed(0);
 	};
 
-	let timer: number | null = null;
-
-	const listenOutput = async () => {
-		const [error, member] = await ATJ(invoke<string>("get_members_by_cli"));
-		if (error) {
-			data.member = [];
-			return "";
-		}
-		if (member === "_EasytierGameCliFailedToConnect_") {
-			data.member = [];
-			stopTimer();
-			const [error] = await ElConfirmDanger("连接已断开,是否重新尝试?", "警告", {
-				confirmButtonText: "重试",
-				cancelButtonText: "关闭窗口"
-			});
-			if (!error) {
-				await listenOutput();
-			} else {
-				const appWindow = getCurrentWindow();
-				await appWindow.close();
-			}
-			return;
-		}
-		const [errorConnections, connections] = await ATJ(invoke<string>("get_members_connections_cli"));
-		const memberConnections: ConnectionsType[] = JSON.parse(connections) as ConnectionsType[];
-
-		if (errorConnections != "_EasytierGameCliFailedToGetConnections_") {
-			data.member = (JSON.parse(member) as Member[]).map(member => {
-				const connection = memberConnections.find(conn => String(conn.route.peer_id) === member.id);
-				if (connection) {
-					member.connections_addrs = connection?.peer?.conns?.map(conn => conn?.tunnel?.remote_addr?.url || "") || [];
-				} else {
-					member.connections_addrs = [];
-				}
-				return member;
-			});
-		} else {
-			data.member = JSON.parse(member) as Member[];
-		}
-		// console.log(data.member);
-		getMembersProxy();
-		startTimer();
-	};
-
-	const getMembersProxy = async () => {
-		const [error, proxy] = await ATJ(invoke<string>("get_members_proxy"));
-		if (error) {
-			data.proxy = [];
-			return "";
-		}
-		if (proxy === "_EasytierGameCliFailedToGetProxy_") {
-			data.proxy = [];
-			return "";
-		}
-		try {
-			data.proxy = JSON.parse(proxy) as Proxy[];
-		} catch (error) {
-			data.proxy = [];
-		}
-	};
-
-	const startTimer = () => {
-		timer && clearTimeout(timer);
-		timer = setTimeout(() => {
-			listenOutput();
-		}, 1000);
-	};
-
-	const stopTimer = () => {
-		timer && clearTimeout(timer);
-		timer = null;
-	};
-
-	onMounted(async () => {
-		await listenOutput();
-	});
-
-	onBeforeUnmount(() => {
-		stopTimer();
-	});
+	const runtime = useRuntimeNetwork("members");
+	watch(
+		runtime,
+		state => {
+			const connections = new Map(state.connections.map(connection => [String(connection.route.peer_id), connection]));
+			data.member = state.members.map(member => ({
+				...member,
+				connections_addrs: connections.get(String(member.id))?.peer?.conns?.map(conn => conn?.tunnel?.remote_addr?.url || "") || []
+			}));
+			data.proxy = state.proxies;
+		},
+		{ immediate: true }
+	);
 </script>
+
+<style scoped>
+	.member-summary {
+		display: flex;
+		gap: 10px;
+		padding: 14px 20px 6px;
+	}
+	.member-summary > section {
+		flex: 1;
+		min-width: 0;
+		padding: 12px;
+		display: flex;
+		flex-direction: column;
+		gap: 3px;
+	}
+	.member-summary span,
+	.member-summary small {
+		font-size: 10px;
+		color: var(--text-3);
+		line-height: 16px;
+	}
+	.member-summary strong {
+		font-size: 13px;
+		font-weight: 600;
+		line-height: 20px;
+	}
+	.member-summary > section:last-child strong {
+		font-size: 11px;
+	}
+	.member-filters {
+		padding-top: 10px;
+		padding-bottom: 10px;
+	}
+	.member-filters > span {
+		margin-left: auto;
+		font-size: 10px;
+		color: var(--text-3);
+	}
+	.member-list {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		padding-top: 0;
+	}
+	.peer-card {
+		flex-shrink: 0;
+		overflow: hidden;
+	}
+	.peer-card.local {
+		background: var(--primary-soft);
+		border-color: color-mix(in srgb, var(--primary) 25%, transparent);
+	}
+	.peer-card-main {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: 12px 14px;
+		width: 100%;
+		text-align: left;
+		border: 0;
+		background: transparent;
+	}
+	.peer-identity {
+		flex: 1;
+		min-width: 0;
+	}
+	.peer-identity > strong {
+		display: block;
+		font-size: 12px;
+		line-height: 20px;
+		font-weight: 600;
+	}
+	.peer-identity small {
+		font-size: 10px;
+		font-weight: 400;
+		color: var(--text-3);
+		margin-left: 4px;
+	}
+	.peer-identity > span {
+		font-size: 10px;
+		color: var(--text-3);
+	}
+	.peer-badges {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		max-width: 188px;
+	}
+	.peer-badges .ui-tag {
+		font-size: 9px;
+		padding: 0 5px;
+		line-height: 16px;
+	}
+	.peer-quality {
+		width: 64px;
+		flex-shrink: 0;
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
+		gap: 4px;
+	}
+	.peer-quality strong {
+		font-size: 12px;
+		font-weight: 500;
+	}
+	.peer-quality small {
+		font-size: 9px;
+		color: var(--text-3);
+	}
+	.peer-expanded {
+		padding: 10px 14px;
+		border-top: 1px solid var(--border);
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		font-size: 11px;
+	}
+	.peer-expanded > div {
+		display: flex;
+		gap: 12px;
+	}
+	.peer-expanded span {
+		color: var(--text-3);
+		min-width: 80px;
+	}
+	.peer-expanded b {
+		font-size: 10px;
+		font-weight: 400;
+		overflow-wrap: anywhere;
+	}
+	.subnet-heading {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		padding-top: 10px;
+		font-size: 11px;
+		color: var(--text-2);
+	}
+	.subnet-heading small {
+		font-size: 10px;
+		color: var(--text-3);
+	}
+	.subnet-heading .text-button {
+		margin-left: auto;
+		font-size: 10px;
+	}
+	.subnet-route {
+		padding: 12px;
+		display: flex;
+		gap: 8px;
+		font-size: 10px;
+		color: var(--text-2);
+	}
+	@media (max-width: 550px) {
+		.peer-badges .ui-tag:last-child {
+			display: none;
+		}
+		.member-summary > section {
+			padding: 10px;
+		}
+		.member-summary {
+			gap: 6px;
+		}
+	}
+</style>

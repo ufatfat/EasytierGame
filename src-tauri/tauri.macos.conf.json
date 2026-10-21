@@ -1,0 +1,19 @@
+{
+  "bundle": {
+    "active": true,
+    "targets": [
+      "app",
+      "dmg"
+    ],
+    "resources": [
+      "easytier/config/",
+      "easytier/icons/",
+      "easytier/config_template.json",
+      "easytier/easytier-core",
+      "easytier/easytier-cli"
+    ],
+    "macOS": {
+      "minimumSystemVersion": "11.0"
+    }
+  }
+}

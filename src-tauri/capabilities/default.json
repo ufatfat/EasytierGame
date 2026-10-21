@@ -2,7 +2,19 @@
 	"$schema": "../gen/schemas/desktop-schema.json",
 	"identifier": "default",
 	"description": "enables the default permissions",
-	"windows": ["main", "log", "member", "nodesList", "cidr", "advance", "tool", "server", "gameList", "storage-listener"],
+	"windows": [
+		"main",
+		"log",
+		"member",
+		"nodesList",
+		"cidr",
+		"advance",
+		"tool",
+		"server",
+		"gameList",
+		"community",
+		"lobby"
+	],
 	"permissions": [
 		"core:default",
 		"core:window:allow-minimize",
@@ -27,11 +39,14 @@
 		"core:tray:allow-set-icon",
 		"core:tray:allow-new",
 		"core:window:allow-set-size",
+		"core:window:allow-set-theme",
 		{
 			"identifier": "shell:allow-spawn",
 			"allow": [
 				{
-					"args": ["run"],
+					"args": [
+						"run"
+					],
 					"cmd": "$RESOURCE/easytier/tool/WinIPBroadcast",
 					"name": "WinIPBroadcast"
 				},
@@ -51,7 +66,9 @@
 			"identifier": "shell:allow-execute",
 			"allow": [
 				{
-					"args": ["run"],
+					"args": [
+						"run"
+					],
 					"cmd": "$RESOURCE/easytier/tool/WinIPBroadcast",
 					"name": "WinIPBroadcast"
 				},
@@ -100,7 +117,20 @@
 		"fs:default",
 		{
 			"identifier": "fs:allow-read-dir",
-			"allow": [{ "path": "$DESKTOP" }, { "path": "$DESKTOP/*" }, { "path": "**/*" }, { "path": "**" }]
+			"allow": [
+				{
+					"path": "$DESKTOP"
+				},
+				{
+					"path": "$DESKTOP/*"
+				},
+				{
+					"path": "**/*"
+				},
+				{
+					"path": "**"
+				}
+			]
 		},
 		"fs:allow-exists",
 		"fs:allow-open",
@@ -119,6 +149,9 @@
 		"log:default",
 		"log:allow-log",
 		"dialog:default",
-		"dialog:allow-open"
+		"dialog:allow-open",
+		"fs:allow-appdata-read-recursive",
+		"fs:allow-appdata-write-recursive",
+		"core:window:allow-start-dragging"
 	]
 }

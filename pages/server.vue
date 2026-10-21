@@ -1,202 +1,198 @@
 <template>
-	<div class="flex h-full flex-col gap-[10px]">
-		<ElForm
-			size="small"
-			label-position="top"
-			:model="mainStore.serverConfig"
-		>
-			<ElFormItem
-				label="白名单"
-				prop="ServerWhiteList"
-				class="full-label full-content !mb-[0] !flex h-full flex-col overflow-hidden"
-			>
-				<template #label>
-					<div class="flex items-center gap-[10px]">
-						白名单
-						<ElSwitch
-							v-model="mainStore.serverConfig.enableWhiteList"
-							inline-prompt
-							active-text="启用"
-							inactive-text="禁用"
-						></ElSwitch>
-
-						<div class="ml-auto">
-							<ElTooltip
-								placement="top"
-								content="打开软件的时候，就会开启这个自建服务"
-							>
-								<ElCheckbox v-model="mainStore.serverConfig.autoStart">自动启动</ElCheckbox>
-							</ElTooltip>
-							<ElTooltip
-								placement="top"
-								content="启用后，不允许使用了与本网络不同的房间名和密码的节点通过本节点进行握手或中转"
-							>
-								<ElCheckbox
-									@click.stop="handlePrivateModeClick"
-									:model-value="mainStore.serverConfig.privateMode"
-								>
-									私有模式
-								</ElCheckbox>
-							</ElTooltip>
-							<ElTooltip
-								placement="top"
-								content="帮助其他虚拟网建立P2P链接"
-							>
-								<ElCheckbox v-model="mainStore.serverConfig.relayAllPeerrpc">转发所有对等节点的RPC数据包</ElCheckbox>
-							</ElTooltip>
-							<ElTooltip
-								placement="top"
-								content="持有公网 IPv6 前缀时开启，让同网络下其他节点自动获取独立公网地址"
-							>
-								<ElCheckbox v-model="mainStore.serverConfig.ipv6PublicAddrProvider">公网IPv6地址前缀提供</ElCheckbox>
-							</ElTooltip>
-							<ElTooltip
-								placement="top"
-								content="禁止节点转发 relay 数据流量而保留控制面功能，适用于不希望本节点承担中继带宽的场景"
-							>
-								<ElCheckbox v-model="mainStore.serverConfig.disableRelayData">禁用Relay数据转发</ElCheckbox>
-							</ElTooltip>
-						</div>
-					</div>
-				</template>
-				<div class="flex h-full w-full flex-col overflow-hidden">
-					<div class="flex-1 overflow-auto">
-						<ElInput
-							:disabled="!mainStore.serverConfig.enableWhiteList"
-							placeholder="一行一个，支持通配符列表，如（ab*）。当该参数的列表为空时，就不会为所有其他网络提供转发服务。"
-							:maxlength="1000"
-							v-model="mainStore.serverConfig.serverWhiteList"
-							type="textarea"
-							:rows="3"
-							resize="none"
-						></ElInput>
-					</div>
+	<section class="panel-window">
+		<PanelHeader
+			icon="server"
+			title="自建服务器"
+			subtitle="让设备成为联机节点，为朋友提供连接入口"
+		/>
+		<div class="panel-scroll server-content">
+			<section class="surface-card server-status">
+				<div class="server-symbol">
+					<AppIcon
+						name="server"
+						:size="24"
+					/>
 				</div>
-			</ElFormItem>
-		</ElForm>
-		<div class="flex items-center gap-[10px]">
-			<div class="flex items-center gap-[5px]">
-				<ElText>服务器端口</ElText>
-				<div class="max-w-[100px]">
-					<ElTooltip content="端口号">
-						<ElInput v-model="mainStore.serverConfig.port"></ElInput>
-					</ElTooltip>
+				<div>
+					<h2>{{ data.isStart ? "服务器运行中" : "服务器未启动" }}</h2>
+					<p>{{ data.isStart ? "正在为联机设备提供连接服务" : "配置监听端口，启动你的专属节点" }}</p>
 				</div>
+				<span
+					class="ui-tag"
+					:class="data.isStart ? 'success' : ''"
+				>
+					{{ data.isStart ? "运行中" : "未启动" }}
+				</span>
+			</section>
+			<section class="surface-card server-options">
+				<div class="server-setting">
+					<div>
+						<h2>服务器端口</h2>
+						<p>其他客户端通过此端口连接</p>
+					</div>
+					<input
+						v-model="mainStore.serverConfig.port"
+						:disabled="data.isStart"
+						class="ui-input mono server-port"
+					/>
+				</div>
+				<div class="server-setting">
+					<div>
+						<h2>白名单</h2>
+						<p>仅为指定房间提供转发，支持 * 通配符</p>
+					</div>
+					<UiSwitch
+						v-model="mainStore.serverConfig.enableWhiteList"
+						label="启用服务器白名单"
+					/>
+				</div>
+				<textarea
+					v-model="mainStore.serverConfig.serverWhiteList"
+					class="ui-input mono whitelist"
+					:disabled="!mainStore.serverConfig.enableWhiteList"
+					rows="4"
+					placeholder="每行一个房间名，例如：my-room 或 game-*"
+				/>
+				<div
+					v-for="setting in serverSettings"
+					:key="setting.key"
+					class="server-setting"
+				>
+					<div>
+						<h2>{{ setting.title }}</h2>
+						<p>{{ setting.help }}</p>
+					</div>
+					<UiSwitch
+						:model-value="(mainStore.serverConfig as any)[setting.key]"
+						:label="setting.title"
+						@update:model-value="
+							setting.key === 'privateMode' ? handlePrivateModeClick() : ((mainStore.serverConfig as any)[setting.key] = $event)
+						"
+					/>
+				</div>
+			</section>
+			<div class="inline-notice">
+				<AppIcon
+					name="info"
+					:size="14"
+				/>
+				请在路由器和防火墙中放行监听端口，确保朋友可以连接到这台设备。
 			</div>
-			<ElButton
-				size="large"
-				:loading="data.loading"
-				:type="data.isStart ? 'danger' : 'primary'"
+			<button
+				class="ui-button server-start"
+				:class="data.isStart ? 'danger' : 'primary'"
+				:disabled="data.loading"
 				@click="hanldeClickStart"
 			>
-				{{ !data.isStart ? "启动服务器" : "停止服务器" }}
-			</ElButton>
+				<AppIcon
+					name="power"
+					:size="16"
+				/>
+				{{ data.loading ? "请稍候…" : data.isStart ? "停止服务器" : "启动服务器" }}
+			</button>
+			<details
+				class="surface-card server-logs"
+				:open="data.isStart"
+				@toggle="logOpen = ($event.target as HTMLDetailsElement).open"
+			>
+				<summary>服务器日志</summary>
+				<RuntimeLog
+					v-if="logOpen"
+					stream="server"
+					embedded
+				/>
+			</details>
 		</div>
-
 		<ElDialog
 			v-model="privateModeDialogData.visible"
-			:close-on-click-modal="false"
-			:close-on-press-escape="false"
 			title="私有模式"
-			:show-close="false"
-			width="300px"
+			width="90%"
 		>
-			<ElAlert
-				type="primary"
-				:closable="false"
-			>
-				建议为服务器设置一个房间名和密码
-			</ElAlert>
-			<div class="h-[15px]"></div>
-			<ElForm
-				:model="mainStore.serverConfig"
-				label-position="top"
-			>
-				<ElFormItem
-					label="房间名"
-					prop="privateNetworkName"
-				>
+			<p class="section-caption">为服务器设置房间名和密码</p>
+			<ElForm label-position="top">
+				<ElFormItem label="房间名"><ElInput v-model="mainStore.serverConfig.privateNetworkName" /></ElFormItem>
+				<ElFormItem label="房间密码">
 					<ElInput
-						clearable
-						placeholder="请输入房间名 (默认为default)"
-						v-model="mainStore.serverConfig.privateNetworkName"
-					></ElInput>
-				</ElFormItem>
-				<ElFormItem
-					label="密码"
-					prop="privateNetworkPassword"
-				>
-					<ElInput
-						clearable
+						v-model="mainStore.serverConfig.privateNetworkPassword"
 						type="password"
 						show-password
-						placeholder="请输入密码 (可选)"
-						v-model="mainStore.serverConfig.privateNetworkPassword"
-					></ElInput>
+					/>
 				</ElFormItem>
 			</ElForm>
 			<template #footer>
-				<ElButton
-					type="primary"
+				<button
+					class="ui-button"
+					@click="privateModeDialogData.visible = false"
+				>
+					取消
+				</button>
+				<button
+					class="ui-button primary ml-2"
 					@click="handlePrivateModeDialogConfirm"
 				>
-					继续启用
-				</ElButton>
+					确认
+				</button>
 			</template>
 		</ElDialog>
-
-		<ElInput
-			placeholder="服务器日志"
-			:model-value="data.log"
-			type="textarea"
-			:rows="14"
-			resize="none"
-		></ElInput>
-	</div>
+	</section>
 </template>
 <script setup lang="ts">
+	import { isTauri } from "@tauri-apps/api/core";
+	import RuntimeLog from "@/components/RuntimeLog.vue";
+	import { useRuntimeNetwork } from "@/composables/runtime";
+	import AppIcon from "@/components/AppIcon.vue";
+	import PanelHeader from "@/components/PanelHeader.vue";
+	import UiSwitch from "@/components/UiSwitch.vue";
 	import useMainStore from "@/stores/index";
-	import { reactive, onMounted, onBeforeUnmount, useTemplateRef, nextTick } from "vue";
+	import { reactive, ref, watch, onMounted, onBeforeUnmount } from "vue";
 	import { getCurrentWindow } from "@tauri-apps/api/window";
 	import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 	import { getServerArgs } from "@/composables/server";
 	import { dataSubscribe } from "@/composables/windows";
 	import { ElMessage, type FormInstance } from "element-plus";
 
-	const appWindow = getCurrentWindow();
+	const appWindow = isTauri() ? getCurrentWindow() : null;
+	const serverSettings = [
+		{ key: "autoStart", title: "随应用自动启动", help: "打开软件时自动启动自建服务" },
+		{ key: "privateMode", title: "私有模式", help: "仅允许相同房间名和密码的节点使用" },
+		{ key: "relayAllPeerrpc", title: "帮助其他节点建立直连", help: "转发所有对等节点的 RPC 消息" },
+		{ key: "ipv6PublicAddrProvider", title: "提供公网 IPv6 前缀", help: "为同网络其他节点分配独立公网地址" },
+		{ key: "disableRelayData", title: "禁用 Relay 数据转发", help: "保留控制面，不承担中继流量" }
+	];
 	const mainStore = useMainStore();
 	const data = reactive({
-		log: "",
 		isStart: false,
 		loading: true
 	});
 
-	const listenStart = async () => {
-		const unListen = await listen<{ log: string; threadId: number | null }>("server_logs", event => {
-			data.log = event.payload.log || "";
-			if (event.payload.threadId) {
-				data.isStart = true;
-			} else {
-				data.isStart = false;
-			}
+	const logOpen = ref(false),
+		runtime = useRuntimeNetwork();
+	watch(
+		runtime,
+		state => {
+			data.isStart = state.server_running;
 			data.loading = false;
-		});
-		return unListen;
-	};
-
-	let unlistenStart: UnlistenFn | null = null;
+		},
+		{ immediate: true }
+	);
+	let offAction: UnlistenFn | undefined;
 	onMounted(async () => {
-		unlistenStart = await listenStart();
+		if (isTauri())
+			offAction = await listen("server-action-finished", () => {
+				data.loading = false;
+			});
 	});
-
-	onBeforeUnmount(() => {
-		unlistenStart && unlistenStart();
-	});
-
+	onBeforeUnmount(() => offAction?.());
 	const hanldeClickStart = async () => {
+		if (!isTauri()) return ElMessage.info("请在桌面客户端启动服务器");
 		data.loading = true;
 		const args = getServerArgs();
-		await appWindow.emitTo("main", "startStopServer", { args });
+		try {
+			await appWindow!.emitTo("main", "startStopServer", { args });
+		} catch (error) {
+			data.loading = false;
+			ElMessage.error(String(error));
+		}
 	};
 
 	// const privateModeDialogFormEl = useTemplateRef<FormInstance>("privateModeDialogFormRef");
@@ -204,7 +200,6 @@
 	const privateModeDialogData = reactive({
 		visible: false
 	});
-
 
 	const handlePrivateModeClick = async () => {
 		if (mainStore.serverConfig.privateMode) {
@@ -217,8 +212,100 @@
 	const handlePrivateModeDialogConfirm = async () => {
 		privateModeDialogData.visible = false;
 		mainStore.serverConfig.privateMode = true;
-		
 	};
 
 	dataSubscribe();
 </script>
+
+<style scoped>
+	.server-content {
+		padding: 16px 20px;
+		display: flex;
+		flex-direction: column;
+		gap: 14px;
+	}
+	.server-status {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		padding: 16px;
+	}
+	.server-symbol {
+		width: 44px;
+		height: 44px;
+		background: var(--primary-soft);
+		color: var(--primary);
+		border-radius: 12px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+	.server-status > div:nth-child(2) {
+		flex: 1;
+	}
+	.server-status h2 {
+		font-size: 14px;
+		font-weight: 600;
+	}
+	.server-status p,
+	.server-setting p {
+		font-size: 10px;
+		color: var(--text-3);
+		line-height: 18px;
+		margin-top: 3px;
+	}
+	.server-options {
+		padding: 0 16px;
+	}
+	.server-setting {
+		padding: 14px 0;
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		border-bottom: 1px solid var(--border);
+	}
+	.server-setting:last-child {
+		border: 0;
+	}
+	.server-setting > div {
+		flex: 1;
+	}
+	.server-setting h2 {
+		font-size: 12px;
+		font-weight: 500;
+	}
+	.server-port {
+		width: 100px;
+		height: 32px;
+	}
+	.whitelist {
+		height: 100px;
+		resize: vertical;
+		margin-top: 12px;
+		padding: 10px;
+		font-size: 11px;
+		line-height: 20px;
+	}
+	.server-start {
+		height: 42px;
+		align-self: flex-end;
+		min-width: 160px;
+	}
+	.server-logs {
+		padding: 12px 14px;
+		font-size: 11px;
+		color: var(--text-2);
+	}
+	.server-logs summary {
+		cursor: pointer;
+	}
+	.server-logs pre {
+		white-space: pre-wrap;
+		overflow-wrap: anywhere;
+		max-height: 220px;
+		overflow: auto;
+		font-size: 10px;
+		line-height: 18px;
+		margin: 10px 0 0;
+	}
+</style>

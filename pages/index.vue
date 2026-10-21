@@ -1,477 +1,25 @@
 <template>
-	<ElForm
-		size="small"
-		label-position="top"
-		:model="mainStore.config"
-	>
-		<ElFormItem
-			label="服务器"
-			prop="serverUrl"
-			class="full-label"
-		>
-			<template #label>
-				<div class="flex flex-nowrap items-center gap-[0_5px]">
-					<div class="flex flex-nowrap items-center gap-[5px]">
-						<div>服务器</div>
-						<ElTooltip content="服务器是什么协议，中转就是什么协议">
-							<ElIcon><QuestionFilled /></ElIcon>
-						</ElTooltip>
-					</div>
-					<div class="h-[fit-content]">-</div>
-					<ElTag
-						effect="dark"
-						:type="data.isSuccessGetIp ? 'success' : 'info'"
-					>
-						{{ data.isSuccessGetIp ? "联机成功" : data.isStart && !data.isSuccessGetIp ? "联机中" : "未联机" }}
-					</ElTag>
-					<ElButton
-						v-if="!data.coreVersion"
-						@click="getCoreVersion(true)"
-					>
-						获取内核版本
-					</ElButton>
-					<div
-						v-else
-						class="flex-1 truncate !leading-[1em]"
-					>
-						<ElTooltip :content="`内核版本:${data.coreVersion}(不是软件的版本)`">
-							<ElTag
-								size="small"
-								type="info"
-							>
-								{{ data.coreVersion }}
-							</ElTag>
-						</ElTooltip>
-					</div>
-					<ElTooltip content="请先停止自建服务和联机后再使用，否则内核被占用的情况下，无法进行内核更换">
-						<ElBadge
-							badge-class="!text-[9px] cursor-pointer ml-auto"
-							:hidden="!haveNewCoreVersion"
-							:offset="[-5, 6]"
-							@click.stop="handleCoreManagement"
-							value="N"
-						>
-							<ElButton
-								class="ml-auto mr-[3px]"
-								:disabled="data.isStart || listenObj.server_thread_id.value"
-								@click.stop="handleCoreManagement"
-								:loading="data.update"
-								type="primary"
-								size="small"
-							>
-								内核管理
-							</ElButton>
-						</ElBadge>
-					</ElTooltip>
-				</div>
-			</template>
-			<ElSelect
-				allow-create
-				:reserve-keyword="false"
-				filterable
-				multiple
-				collapse-tags
-				collapse-tags-tooltip
-				placeholder="请选择服务器地址"
-				default-first-option
-				v-model="mainStore.config.serverUrl"
-				no-data-text="无服务器地址"
-				@change="handleServerUrlChange"
-			>
-				<template #prefix>
-					<div :class="mainStore.config.protocol && mainStore.config.protocol.length > 1 ? 'w-[110px]' : 'w-[80px]'">
-						<ElSelect
-							placeholder="协议"
-							multiple
-							collapse-tags
-							@click.stop
-							v-model="mainStore.config.protocol"
-						>
-							<ElOption
-								v-for="item in protocols"
-								:key="item"
-								:label="item"
-								:value="item"
-							></ElOption>
-						</ElSelect>
-					</div>
-				</template>
-				<template #footer>
-					<div class="text-center">
-						<ElLink
-							type="primary"
-							size="small"
-							underline="never"
-							@click.stop="handleShowPublicServersDialog"
-						>
-							其他公共服务器
-						</ElLink>
-					</div>
-				</template>
-				<ElOption
-					v-for="item in mainStore.basePeers"
-					:key="item"
-					:label="item"
-					:value="item"
-				>
-					<div class="flex max-w-[calc(100vw-62px)] flex-nowrap items-center gap-[20px] overflow-hidden">
-						<ElTooltip
-							v-if="item && item.length > 26"
-							placement="top"
-							:content="item || '-'"
-						>
-							<p class="truncate">{{ item }}</p>
-						</ElTooltip>
-						<p
-							v-else
-							class="truncate"
-						>
-							{{ item }}
-						</p>
-						<div class="ml-auto flex-shrink-0">
-							<ElButton
-								@click.stop="copyText(item)"
-								circle
-								size="small"
-								title="复制"
-								:icon="CopyDocument"
-							></ElButton>
-
-							<ElButton
-								@click.stop="handleDeleteServerUrl(item)"
-								circle
-								size="small"
-								:icon="Delete"
-								title="删除"
-								type="danger"
-							></ElButton>
-						</div>
-					</div>
-				</ElOption>
-			</ElSelect>
-		</ElFormItem>
-		<div class="flex flex-wrap items-center gap-[0_10px]">
-			<div class="flex-1">
-				<ElFormItem label="房间名">
-					<template #label>
-						<div class="flex items-center">
-							房间名
-							<!-- <ElTooltip content="对应命令行参数 --network-name">
-								<ElIcon><QuestionFilled /></ElIcon>
-							</ElTooltip> -->
-						</div>
-					</template>
-					<ElInput
-						maxlength="100"
-						placeholder="请输入房间名"
-						v-model="mainStore.config.networkName"
-					></ElInput>
-				</ElFormItem>
-			</div>
-			<div class="flex-1">
-				<ElFormItem label="房间密码">
-					<template #label>
-						<div class="flex items-center">
-							房间密码
-							<!-- <ElTooltip content="对应命令行参数 --network-secret">
-								<ElIcon><QuestionFilled /></ElIcon>
-							</ElTooltip> -->
-						</div>
-					</template>
-					<ElInput
-						show-password
-						maxlength="100"
-						placeholder="请输入房间密码"
-						v-model="mainStore.config.networkPassword"
-						type="password"
-					></ElInput>
-				</ElFormItem>
-			</div>
-		</div>
-		<div class="flex gap-[0_10px]">
-			<ElFormItem label="成员名">
-				<template #label>
-					<div class="flex items-center">
-						成员名
-						<!-- <ElTooltip content="对应命令行参数 --hostname">
-							<ElIcon><QuestionFilled /></ElIcon>
-						</ElTooltip> -->
-					</div>
-				</template>
-				<ElInput
-					maxlength="100"
-					placeholder="例如: Player1"
-					v-model="mainStore.config.hostname"
-				></ElInput>
-			</ElFormItem>
-			<ElFormItem
-				class="w-[70%]"
-				label="局域网IP"
-			>
-				<template #label>
-					<div class="flex h-[22px] items-center gap-[3px]">
-						<div class="mr-[8px]">IP</div>
-						<ElSwitch
-							v-model="mainStore.config.dhcp"
-							inline-prompt
-							inactive-text="固定V4"
-							active-text="动态V4"
-							size="small"
-						></ElSwitch>
-						<ElTooltip>
-							<template #content>
-								<div>选填V6地址，可与IPv4一起使用以进行双栈操作</div>
-								<div>----------------------------------------</div>
-								<div>当前V6地址: {{ mainStore.config.ipv6 || "-" }}</div>
-							</template>
-							<ElButton
-								text
-								size="small"
-								class="cursor-pointer"
-								@click="handleDealIpv6"
-								:type="mainStore.config.ipv6 ? 'success' : 'info'"
-							>
-								V6
-							</ElButton>
-						</ElTooltip>
-						<ElDivider direction="vertical" />
-						<ElButton
-							@click.stop="handleCopyIp"
-							type="primary"
-							text
-							size="small"
-							title="复制V4"
-							:icon="CopyDocument"
-						></ElButton>
-						<!-- <ElTooltip content="对应命令行参数 --ipv4">
-							<ElIcon><QuestionFilled /></ElIcon>
-						</ElTooltip> -->
-					</div>
-				</template>
-				<ElInput
-					maxlength="100"
-					:readonly="mainStore.config.dhcp"
-					:placeholder="data.isStart && mainStore.config.dhcp ? '等待动态分配IP...' : '例如: 10.126.126.1'"
-					v-model="mainStore.config.ipv4"
-				>
-					<template #prefix>
-						<ElTooltip
-							class="!text-[10px]"
-							placement="top-end"
-							:content="mainStore.config.dhcp ? '动态获取无法手动填写' : '固定IP可以手动填写'"
-						>
-							<ElTag
-								size="small"
-								:type="mainStore.config.dhcp ? 'info' : 'success'"
-							>
-								{{ mainStore.config.dhcp ? "只读" : "可填" }}
-							</ElTag>
-						</ElTooltip>
-					</template>
-				</ElInput>
-			</ElFormItem>
-		</div>
-	</ElForm>
-	<!-- <div class="flex justify-center items-center gap-[5px]">
-		<el-button>分享当前配置</el-button>
-		<el-button>导入联机配置</el-button>
-	</div> -->
-	<div class="mt-auto flex items-start">
-		<div>
-			<div class="pt-[4px]">
-				<ElDropdown
-					@command="handleStartCommand"
-					split-button
-					trigger="click"
-					size="default"
-					placement="right-end"
-					:type="!data.isStart ? 'primary' : 'danger'"
-					:disabled="data.startLoading || !data.coreVersion || data.update"
-					@click="handleConnection"
-				>
-					{{ !data.isStart ? "启动联机" : "停止联机" }}
-					<template #dropdown>
-						<ElDropdownMenu>
-							<ElDropdownItem
-								:icon="SetUp"
-								command="create_server"
-							>
-								自建服务器
-								<ElTag
-									size="small"
-									class="ml-[5px]"
-									:type="listenObj.server_thread_id.value ? 'success' : 'info'"
-								>
-									{{ listenObj.server_thread_id.value ? "运行中" : "未运行" }}
-								</ElTag>
-							</ElDropdownItem>
-							<ElDropdownItem
-								:icon="Tools"
-								command="toml"
-								:disabled="data.isStart"
-							>
-								使用外部配置文件
-							</ElDropdownItem>
-							<ElDropdownItem disabled>
-								<ElDivider class="!m-0 !h-[2px]" />
-							</ElDropdownItem>
-							<ElDropdownItem
-								command="config_admin"
-								:icon="Platform"
-							>
-								房间配置管理
-							</ElDropdownItem>
-							<ElDropdownItem
-								command="save_config_admin"
-								:icon="CirclePlusFilled"
-							>
-								保存当前房间配置
-							</ElDropdownItem>
-							<ElDropdownItem
-								command="game_start_config"
-								:icon="SwitchFilled"
-							>
-								本地游戏列表
-							</ElDropdownItem>
-							<ElDropdownItem disabled>
-								<ElDivider class="!m-0 !h-[2px]" />
-							</ElDropdownItem>
-							<ElDropdownItem
-								command="cidr"
-								:icon="Share"
-							>
-								子网代理
-							</ElDropdownItem>
-							<!-- <ElDropdownItem
-								command="import_config"
-								:icon="Link"
-							>
-								导入联机配置
-							</ElDropdownItem>
-							<ElDropdownItem
-								command="share_config"
-								:icon="Share"
-							>
-								分享联机配置
-							</ElDropdownItem> -->
-							<ElDropdownItem
-								command="reconnect"
-								:icon="RefreshRight"
-							>
-								重新联机
-							</ElDropdownItem>
-						</ElDropdownMenu>
-					</template>
-				</ElDropdown>
-			</div>
-			<div class="mt-[10px] pl-[2px]">
-				<ElTooltip
-					placement="top"
-					content="日志"
-				>
-					<ElButton
-						:type="!data.logVisible ? 'info' : 'warning'"
-						@click="handleShowLogDialog"
-						:icon="List"
-						size="small"
-						plain
-					></ElButton>
-				</ElTooltip>
-				<!-- <ElTooltip
-					placement="left"
-					content="房间信息"
-				> -->
-				<ElButton
-					class="!ml-[7px]"
-					@click="handleShowMemberDialog"
-					plain
-					type="success"
-					size="small"
-				>
-					房间信息
-				</ElButton>
-				<!-- </ElTooltip> -->
-			</div>
-		</div>
-		<div class="ml-auto">
-			<ElCheckbox
-				v-model="mainStore.config.disbleP2p"
-				size="small"
-			>
-				强制中转
-			</ElCheckbox>
-			<ElTooltip
-				placement="top-start"
-				content="自启后隐藏于托盘，不显示界面"
-			>
-				<ElCheckbox
-					@change="handleAutoStartByTask"
-					:model-value="mainStore.config.autoStart"
-					size="small"
-				>
-					开机自启
-				</ElCheckbox>
-			</ElTooltip>
-			<div class="flex items-center gap-[0_2px]">
-				<ElDropdown
-					@command="handleStartCommand"
-					trigger="click"
-					:show-arrow="false"
-				>
-					<ElButton
-						:icon="Share"
-						size="small"
-					>
-						分享/导入
-					</ElButton>
-					<template #dropdown>
-						<el-dropdown-item command="share_config">分享联机配置</el-dropdown-item>
-						<el-dropdown-item command="import_config">导入联机配置</el-dropdown-item>
-					</template>
-				</ElDropdown>
-				<div>
-					<ElButton
-						@click="handleShowAdvanceDialog"
-						:icon="Setting"
-						size="small"
-					>
-						高级选项
-					</ElButton>
-				</div>
-			</div>
-			<div class="flex items-center gap-[0_5px]">
-				<div>
-					<ElButton
-						plain
-						type="primary"
-						size="small"
-						:icon="MagicStick"
-						@click="handleShowToolDialog"
-					>
-						增强工具
-					</ElButton>
-				</div>
-
-				<ElBadge
-					badge-class="!text-[9px] cursor-pointer"
-					:hidden="!hasNewVersion"
-					:offset="[6, 7]"
-					value="N"
-				>
-					<!-- <ElTooltip :disabled="!data.hasNewVersion" content="有新版发布了!"> -->
-					<ElLink
-						class="ml-[8px] truncate pb-[2px] !text-[9px]"
-						type="info"
-						underline="never"
-						@click="open('https://github.com/EasyTier/EasytierGame')"
-					>
-						EasytierGame主页
-					</ElLink>
-					<!-- </ElTooltip> -->
-				</ElBadge>
-			</div>
-		</div>
-	</div>
+	<LauncherHome
+		:running="data.isStart"
+		:connected="data.isSuccessGetIp"
+		:loading="data.startLoading"
+		:core-version="data.coreVersion"
+		:updating="data.update"
+		:has-update="haveNewCoreVersion"
+		:peers="peers"
+		:elapsed="elapsed"
+		:failure="failure"
+		:active-panels="activePanels"
+		@connect="handleConnection"
+		@core="handleCoreManagement"
+		@navigate="navigatePanel"
+		@command="homeCommand"
+		@public-servers="handleShowPublicServersDialog"
+		@server-change="handleServerUrlChange"
+		@copy-ip="handleCopyIp"
+		@ipv6="handleDealIpv6"
+		@autostart="handleAutoStartByTask"
+	/>
 	<ElDialog
 		width="95%"
 		top="10px"
@@ -766,7 +314,13 @@
 	</ElDialog>
 </template>
 <script setup lang="ts">
-	import { invoke } from "@tauri-apps/api/core";
+	import { exactPeerUrls, roomJoinPatch, publicationSnapshot } from "@/utils/lobby-domain";
+	import { roomConnection } from "@/composables/lobby";
+	import LauncherHome from "@/components/LauncherHome.vue";
+	import { listRooms, heartbeatRoom, removeRoom, type RoomConnection } from "@/composables/lobby";
+	import { registeredAddress } from "@/composables/coordinator";
+	import { isWindows, dataBaseDir, getDataDir as getResourceDir, openFolder } from "@/composables/platform";
+	import { invoke, isTauri } from "@tauri-apps/api/core";
 	import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 	import { open, Command } from "@tauri-apps/plugin-shell";
 	import {
@@ -786,7 +340,7 @@
 		Platform,
 		SwitchFilled
 	} from "@element-plus/icons-vue";
-	import { reactive, onBeforeUnmount, onMounted, ref, toRaw, computed } from "vue";
+	import { reactive, onBeforeUnmount, onMounted, ref, toRaw, computed, watch } from "vue";
 	import { useTray, setTrayRunState, setTrayTooltip, checkNewVersion, hasNewVersion } from "~/composables/tray";
 	import { getMatches } from "@tauri-apps/plugin-cli";
 	import { initStartWinIpBroadcast } from "~/composables/netcard";
@@ -795,14 +349,27 @@
 	import { getCurrentWindow, PhysicalSize, type Window } from "@tauri-apps/api/window";
 	import { getAllWebviewWindows, WebviewWindow } from "@tauri-apps/api/webviewWindow";
 	import etWindows, { dataSubscribe } from "@/composables/windows";
-	import { resourceDir as getResourceDir, join } from "@tauri-apps/api/path";
-	import { readDir, exists, mkdir, BaseDirectory, readTextFile, readFile, writeFile, remove as removeFile, stat } from "@tauri-apps/plugin-fs";
+	import { join } from "@tauri-apps/api/path";
+	import {
+		readDir,
+		exists,
+		mkdir,
+		BaseDirectory,
+		readTextFile,
+		readFile,
+		writeFile,
+		writeTextFile,
+		remove as removeFile,
+		stat
+	} from "@tauri-apps/plugin-fs";
 	import { updateConfigJson, updateConfigJsonBounce } from "~/composables/configJson";
 	import { writeText, readText } from "@tauri-apps/plugin-clipboard-manager";
 	import { sortedUniq, uniq } from "lodash-es";
 	import { addQQGroup, supportProtocols, preventSleep, stopPreventSleep, ATJ, copyText, isValidWindowsFileName, mixedArray } from "~/utils";
 	import { ElConfirmDanger, ElConfirmPrimary } from "~/utils/element";
 	import { getServerArgs } from "@/composables/server";
+	import { useRuntimeNetwork } from "@/composables/runtime";
+	import { networkSnapshot } from "@/composables/lobby";
 	import { isIPv6 } from "is-ip";
 
 	let is_close = false;
@@ -810,11 +377,12 @@
 	const tray = await useTray(
 		true,
 		async () => {
-			is_close = true;
 			await invoke("stop_command", { child_id: listenObj.thread_id || 0 });
 			await invoke("stop_command", { child_id: data.winipBcPid || 0 });
 			await invoke("stop_command", { child_id: listenObj.server_thread_id.value || 0 });
+			await stopPublishedRoom();
 			await stopPreventSleep(); //关闭防休眠
+			is_close = true;
 		},
 		async () => {
 			await handleConnection();
@@ -829,6 +397,69 @@
 	);
 
 	const mainStore = useMainStore();
+	const peers = ref<Member[]>([]),
+		failure = ref("");
+	const startedAt = ref(0),
+		elapsed = ref(0);
+	let clockTimer: ReturnType<typeof setInterval> | undefined;
+	const sharedPanelVisibility = reactive({ lobby: false, community: false });
+	const activePanels = computed(() =>
+		Object.entries({
+			...sharedPanelVisibility,
+			member: data.memberVisible,
+			gameList: data.gameListVisible,
+			advance: data.advanceVisible,
+			tool: data.toolVisible,
+			log: data.logVisible
+		})
+			.filter(([, open]) => open)
+			.map(([name]) => name)
+	);
+	const homeCommand = async (command: string) => {
+		if (command === "core") return handleCoreManagement();
+		if (command === "share_import") {
+			const result = await ElMessageBox.confirm("分享当前联机配置，或粘贴朋友的分享码", "分享 / 导入", {
+				confirmButtonText: "分享配置",
+				cancelButtonText: "导入配置",
+				distinguishCancelAndClose: true
+			})
+				.then(() => "share_config")
+				.catch(reason => (reason === "cancel" ? "import_config" : null));
+			if (result) await handleStartCommand(result);
+			return;
+		}
+		await handleStartCommand(command);
+	};
+	const navigatePanel = async (page: string) => {
+		const actions: Record<string, () => Promise<any>> = {
+			member: handleShowMemberDialog,
+			gameList: () => handleStartCommand("game_start_config"),
+			tool: handleShowToolDialog,
+			advance: handleShowAdvanceDialog,
+			log: handleShowLogDialog
+		};
+		if (actions[page]) return actions[page]();
+		if (["lobby", "community"].includes(page)) {
+			const panel = page as "lobby" | "community";
+			await etWindows(
+				page,
+				{
+					title: page === "lobby" ? "房间大厅" : "社区 · 全局 IP 与公告",
+					url: `#/${page}`,
+					width: 600,
+					height: 720,
+					minWidth: 520,
+					minHeight: 480
+				},
+				() => {
+					sharedPanelVisibility[panel] = true;
+				},
+				() => {
+					sharedPanelVisibility[panel] = false;
+				}
+			);
+		}
+	};
 
 	const protocols = supportProtocols();
 	const data = reactive({
@@ -844,10 +475,9 @@
 		winipBcStart: false,
 		memberVisible: false,
 		log: "",
-		serverLog: "", //服务端日志
 		update: false,
 		releaseList: [[]],
-		coreVersion: "-",
+		coreVersion: "",
 		isSuccessGetIp: false,
 		startLoading: false,
 		isStart: false,
@@ -949,14 +579,14 @@
 		const cache_path = import.meta.env.VITE_CACHE_PATH;
 		const resourceDir = await getResourceDir();
 		const configPath = await join(resourceDir, cache_path);
-		const isExists = await exists(cache_path, { baseDir: BaseDirectory.Resource });
+		const isExists = await exists(cache_path, { baseDir: dataBaseDir() });
 		if (!isExists) {
 			try {
-				await mkdir(cache_path, { baseDir: BaseDirectory.Resource });
+				await mkdir(cache_path, { baseDir: dataBaseDir() });
 			} catch (err) {}
 		}
 		// console.error(configPath);
-		await Command.create("explorer", [configPath]).execute();
+		await openFolder(configPath);
 	};
 
 	const handleDeleteServerUrl = (url: string) => {
@@ -999,46 +629,50 @@
 		mainStore.basePeers = uniq([...mainStore.config.serverUrl, ...mainStore.basePeers]);
 	};
 
-	let getMemeberTimer: number | null = null;
+	const sharedRuntime = useRuntimeNetwork();
+	watch(sharedRuntime, async state => {
+		if (!isTauri()) return;
+		peers.value = state.members;
+		mainStore.networkRunning = state.client_running || state.server_running;
+		if (state.client_running) data.isStart = true;
+		else if (!data.startLoading) {
+			data.isStart = false;
+			await ipReset();
+			return;
+		}
+		const local = state.members.find(member => member.cost === "Local");
+		if (state.connected && local?.ipv4) {
+			const changed = !data.isSuccessGetIp || mainStore.config.ipv4 !== local.ipv4;
+			mainStore.config.ipv4 = local.ipv4;
+			data.isSuccessGetIp = true;
+			data.startLoading = false;
+			if (!startedAt.value) startedAt.value = Date.now();
+			if (changed) {
+				await setTrayRunState(tray, true);
+				await setTrayTooltip(tray, `IP: ${local.ipv4}`);
+			}
+		} else if (data.isSuccessGetIp) {
+			await ipReset();
+		}
+	});
 	const listenObj: { [key: string]: any } = {
 		unListenOutPut: null,
 		unListenThreadId: null,
-		unListenServerOutPut: null,
 		unListenServerThreadId: null,
 		unListenStartStopServer: null,
 		thread_id: null,
 		server_thread_id: ref(null),
 		async listenOutput() {
 			// const appWindow = getCurrentWindow();
-			getMemeberTimer && clearInterval(getMemeberTimer);
-			getMemeberTimer = setInterval(async () => {
-				const [error, member] = await ATJ(invoke<string>("get_members_by_cli"));
-				if(!data.isStart) {
-					getMemeberTimer && clearInterval(getMemeberTimer);
-					getMemeberTimer = null;
-					ipReset();
-					return;
-				}
-				if (!error && member !== "_EasytierGameCliFailedToConnect_") {
-					const memberJson = JSON.parse(member) as Member[];
-					const localData = memberJson.find(member => member?.cost == "Local");
-					const ipv4 = localData?.ipv4;
-					if (localData && ipv4) {
-						mainStore.config.ipv4 = ipv4;
-						await setTrayRunState(tray, true);
-						data.isSuccessGetIp = true;
-						await setTrayTooltip(tray, `IP: ${mainStore.config.ipv4}`);
-						return;
-					}
-					ipReset();
-				}
-			}, 1000);
 			const unListen = await listen<string>("command-output", async event => {
+				if (!mainStore.networkRunning) return;
 				data.isStart = true;
+				mainStore.networkRunning = true;
 				if (event.payload) {
 					data.startLoading = false;
 					let devName = /tun device ready. dev: (.*)/g.exec(event.payload as string)?.[1];
 					if (
+						isWindows &&
 						devName &&
 						mainStore.config.enableNetCardMetric &&
 						mainStore.config.netCardMetricValue &&
@@ -1059,13 +693,8 @@
 						}
 					}
 				}
-				const logArr = data.log.split("\n");
-				const start = logArr.length > 1000 ? logArr.length - 1000 : 0;
-				data.log = logArr.slice(start).join("\n");
-				data.log += (event.payload as string) + "\n";
 			});
 			this.unListenOutPut = () => {
-				getMemeberTimer && clearInterval(getMemeberTimer);
 				unListen();
 			};
 		},
@@ -1077,16 +706,6 @@
 			});
 			this.unListenThreadId = unListen;
 		},
-		async listenServerOutPut() {
-			const unListen = await listen<string>("server-command-output", async event => {
-				// console.log("server-command-output", event);
-				const logArr = data.serverLog.split("\n");
-				const start = logArr.length > 1000 ? logArr.length - 1000 : 0;
-				data.serverLog = logArr.slice(start).join("\n");
-				data.serverLog += (event.payload || "") + "\n";
-			});
-			this.unListenServerOutPut = unListen;
-		},
 		async listenServerThreadId() {
 			const unListen = await listen("server-thread-id", event => {
 				if (event.payload) {
@@ -1097,27 +716,24 @@
 		},
 
 		async listenStartStopServer() {
-			const unListen = await listen<{ args: Array<string> }>("startStopServer", async event => {
-				await listenObj?.unListenServerOutPut?.();
-				await invoke("stop_command", { child_id: listenObj.server_thread_id.value || 0 });
-				if (listenObj.server_thread_id.value) {
-					listenObj.server_thread_id.value = null;
-				} else {
-					data.serverLog = "";
-					await listenObj.listenServerOutPut();
-					await invoke("run_command", {
-						args: event.payload.args,
-						is_server: true
-					});
+			this.unListenStartStopServer = await listen<{ args: string[] }>("startStopServer", async event => {
+				try {
+					await invoke("stop_command", { child_id: listenObj.server_thread_id.value || 0 });
+					if (listenObj.server_thread_id.value) listenObj.server_thread_id.value = null;
+					else await invoke("run_command", { args: event.payload.args, is_server: true });
+				} catch (error) {
+					ElMessage.error(String(error));
+				} finally {
+					await getCurrentWindow().emitTo("server", "server-action-finished", null);
 				}
 			});
-			this.unListenStartStopServer = unListen;
 		}
 	};
 
 	const unListenAll = async () => {
-		listenObj.unListenOutPut && (await listenObj.unListenOutPut());
+		if (!isTauri()) return;
 		await invoke("stop_command", { child_id: listenObj.thread_id || 0 });
+		listenObj.unListenOutPut && (await listenObj.unListenOutPut());
 		listenObj.thread_id = null;
 	};
 
@@ -1261,6 +877,10 @@
 	};
 
 	const compatibleInitAutoStart = async () => {
+		if (!isWindows) {
+			mainStore.config.autoStart = false;
+			return;
+		}
 		try {
 			let is_enable_by_task = (await invoke("autostart_is_enabled")) as boolean;
 			if (is_enable_by_task) {
@@ -1313,9 +933,9 @@
 
 	const initGuiJson = async () => {
 		const path = import.meta.env.VITE_CONFIG_FILE_NAME;
-		const isExists = await exists(path, { baseDir: BaseDirectory.Resource });
+		const isExists = await exists(path, { baseDir: dataBaseDir() });
 		if (isExists) {
-			const guiJsonStrUint8 = await readFile(path, { baseDir: BaseDirectory.Resource });
+			const guiJsonStrUint8 = await readFile(path, { baseDir: dataBaseDir() });
 			if (guiJsonStrUint8) {
 				try {
 					const decoder = new TextDecoder("utf-8");
@@ -1371,10 +991,9 @@
 	const initAutoStartServer = async () => {
 		if (mainStore.serverConfig.autoStart && data.coreVersion) {
 			const args = getServerArgs();
-			await listenObj?.unListenServerOutPut?.();
+
 			await invoke("stop_command", { child_id: listenObj.server_thread_id.value || 0 });
-			data.serverLog = "";
-			await listenObj.listenServerOutPut();
+
 			await invoke("run_command", {
 				args,
 				is_server: true
@@ -1397,8 +1016,8 @@
 		}
 		const appWindow = getCurrentWindow();
 		const logicalAppSize = {
-			width: 340,
-			height: 305
+			width: 400,
+			height: 720
 		};
 		const scaleFactor = await appWindow.scaleFactor();
 		const size = new PhysicalSize(Math.ceil(logicalAppSize.width * scaleFactor), Math.ceil(logicalAppSize.height * scaleFactor));
@@ -1409,11 +1028,35 @@
 		});
 	};
 
-	let logsTimer: number | null = null;
-	let serverLogsTimer: number | null = null;
-	let cidrTimer: number | null = null;
+	let lobbyHeartbeat: ReturnType<typeof setInterval> | undefined;
+	const heartbeatPublication = async () => {
+		if (!mainStore.lobby.roomId) return;
+		const snapshot = await networkSnapshot();
+		if (!snapshot.connected) return;
+		if (mainStore.configStartEnable || mainStore.lobby.connectionSnapshot !== publicationSnapshot(mainStore.config)) {
+			mainStore.lobby.roomId = "";
+			return;
+		}
+		try {
+			await heartbeatRoom(mainStore.lobby.roomId, Math.max(1, snapshot.members.filter(p => p.ipv4 && p.ipv4 !== "-").length));
+		} catch (error) {
+			if (/房间已下架|房间不存在|心跳超时/.test(String(error))) mainStore.lobby.roomId = "";
+			console.warn("房间心跳失败，将在下一轮重试", error);
+		}
+	};
+	const saveJoinedRoom = async (title: string) => {
+		const path = import.meta.env.VITE_CONFIG_ADMIN_PATH;
+		await mkdir(path, { baseDir: dataBaseDir(), recursive: true });
+		const { coordinator: _identity, lobby: _lobby, networkRunning: _runtime, ...roomConfig } = mainStore.$state;
+		const safe = title.replace(/[<>:"/\\|?*\x00-\x1F]/g, "_").slice(0, 60) || "大厅房间";
+		await writeTextFile(`${path}${safe}-${Date.now()}.json`, btoa(encodeURIComponent(JSON.stringify(roomConfig))), { baseDir: dataBaseDir() });
+	};
 
 	onMounted(async () => {
+		if (!isTauri()) return;
+		clockTimer = setInterval(() => {
+			elapsed.value = startedAt.value ? Math.floor((Date.now() - startedAt.value) / 1000) : 0;
+		}, 1000);
 		await compatibleInitServerUrl();
 		await initGuiJson();
 		await compatibleInitAutoStart();
@@ -1421,8 +1064,46 @@
 		// await initStartWinIpBroadcast();  // 对于三层tun而言，winipbroadcast没有作用，先禁用
 		await getCoreVersion();
 		await listenObj.listenThreadId();
+		listenObj.unListenExit = await listen<{ pid: number; error: string }>("command-exit", async event => {
+			if (event.payload.pid !== listenObj.thread_id) return;
+			data.startLoading = false;
+			data.isStart = false;
+			mainStore.networkRunning = false;
+			listenObj.thread_id = null;
+			await ipReset();
+			if (event.payload.error) {
+				failure.value = event.payload.error;
+				ElMessage.error(event.payload.error);
+			}
+			await stopPublishedRoom();
+		});
 		await listenObj.listenServerThreadId();
+		listenObj.unListenServerExit = await listen<{ pid: number; error: string }>("server-command-exit", event => {
+			if (event.payload.pid === listenObj.server_thread_id.value) listenObj.server_thread_id.value = null;
+		});
 		await listenObj.listenStartStopServer();
+		lobbyHeartbeat = setInterval(heartbeatPublication, 30000);
+		listenObj.unListenLobbyJoin = await listen<{ requestId: string; replyTo: string; roomId: string; password: string; saveConfig: boolean }>(
+			"lobby-join",
+			async ({ payload }) => {
+				if (payload.replyTo !== "lobby") return;
+				let error = "";
+				try {
+					if (data.startLoading) throw new Error("当前正在启动，请稍后重试");
+					const connection = await roomConnection(payload.roomId);
+					const patch = roomJoinPatch(mainStore.config, connection, typeof payload.password === "string" ? payload.password : "");
+					if (data.isStart) await reset();
+					mainStore.$patch({ config: patch, configStartEnable: false });
+					mainStore.$persist();
+					if (payload.saveConfig) await saveJoinedRoom(connection.network_name);
+					await handleConnection();
+					if (!data.isStart) throw new Error(failure.value || "未能启动联机，请检查主窗口提示");
+				} catch (e) {
+					error = String(e instanceof Error ? e.message : e);
+				}
+				await getCurrentWindow().emitTo("lobby", "lobby-join-result", { requestId: payload.requestId, error });
+			}
+		);
 		await initConfigDir();
 		await initAutoStartServer();
 		await initConnectAfterStart();
@@ -1433,7 +1114,6 @@
 			getReleaseList();
 			checkNewVersion();
 		}
-		await storageDialog();
 	});
 
 	// storageEventEmitter.addEventListener("localStorageChange", () => {
@@ -1447,12 +1127,15 @@
 	});
 
 	onBeforeUnmount(() => {
+		clearInterval(clockTimer);
+		clearInterval(lobbyHeartbeat);
+		listenObj.unListenLobbyJoin?.();
+		if (!isTauri()) return;
 		unListenAll();
 		listenObj.unListenReleaseList && listenObj.unListenReleaseList();
 		listenObj.unListenStartStopServer && listenObj.unListenStartStopServer();
-		logsTimer && clearInterval(logsTimer);
-		serverLogsTimer && clearInterval(serverLogsTimer);
-		cidrTimer && clearInterval(cidrTimer);
+		listenObj.unListenExit?.();
+		listenObj.unListenServerExit?.();
 		stopPreventSleep();
 		// unListenStorage && unListenStorage();
 	});
@@ -1460,9 +1143,16 @@
 	const getArgs = async () => {
 		// console.error(config.proxyNetworks);
 		const args = [];
+		let fixedAddress: string | null;
+		try {
+			fixedAddress = await registeredAddress();
+		} catch (error) {
+			ElMessage.error(String(error));
+			return [];
+		}
 		if (mainStore.configStartEnable) {
 			if (mainStore.configPath) {
-				const isExists = await exists(mainStore.configPath, { baseDir: BaseDirectory.Resource });
+				const isExists = await exists(mainStore.configPath, { baseDir: dataBaseDir() });
 				if (isExists) {
 					const resourceDir = await getResourceDir();
 					const configPath = await join(resourceDir, mainStore.configPath);
@@ -1496,7 +1186,7 @@
 			ElMessage.warning(`请至少选择一个协议`);
 			return [];
 		}
-		if (mainStore.config.dhcp) {
+		if (!fixedAddress && mainStore.config.dhcp) {
 			args.push("-d");
 		}
 		if (mainStore.config.hostname) {
@@ -1508,12 +1198,11 @@
 		if (mainStore.config.networkPassword) {
 			args.push("--network-secret", mainStore.config.networkPassword);
 		}
-		if (mainStore.config.ipv4) {
-			args.push("--ipv4", mainStore.config.ipv4.trim());
+		if (fixedAddress || (!mainStore.config.dhcp && mainStore.config.ipv4)) {
+			args.push("--ipv4", fixedAddress || mainStore.config.ipv4.trim());
 		}
 		if (mainStore.config.serverUrl) {
-			const formatUrlArr = mainStore.config.serverUrl.map((url: string) => url.replace(/\\/g, "/"));
-			args.push("--peers", ...mixedArray(mainStore.config.protocol, formatUrlArr, "://"));
+			args.push("--peers", ...exactPeerUrls(mainStore.config));
 		}
 		if (mainStore.config.enableCustomProtocol) {
 			const includes = mainStore.config.protocol.includes(mainStore.config.customProtocol);
@@ -1552,7 +1241,7 @@
 					return /^\d+\.\d+\.\d+\.\d+\/\d+$/g.test(cidr);
 				});
 			if (newformatProxyNetworks.length > 0) {
-				for(const cidr of newformatProxyNetworks) {
+				for (const cidr of newformatProxyNetworks) {
 					args.push("-n", cidr);
 				}
 			}
@@ -1583,9 +1272,14 @@
 			args.push("--relay-all-peer-rpc", "true");
 		}
 		if (mainStore.config.saveErrorLog) {
-			args.push("--file-log-level", mainStore.config.logLevel, "--file-log-dir", import.meta.env.VITE_LOG_PATH);
+			args.push(
+				"--file-log-level",
+				mainStore.config.logLevel,
+				"--file-log-dir",
+				await join(await getResourceDir(), import.meta.env.VITE_LOG_PATH)
+			);
 		}
-		if (mainStore.config.devName && mainStore.config.devNameValue) {
+		if (isWindows && mainStore.config.devName && mainStore.config.devNameValue) {
 			args.push("--dev-name", mainStore.config.devNameValue);
 		}
 		if (mainStore.config.compression && mainStore.config.compression != "none") {
@@ -1603,7 +1297,7 @@
 		if (mainStore.config.disableQuicInput) {
 			args.push("--disable-quic-input", "true");
 		}
-		if (mainStore.config.enableUdpBroadcastRelay) {
+		if (isWindows && mainStore.config.enableUdpBroadcastRelay) {
 			args.push("--enable-udp-broadcast-relay", "true");
 		}
 		if (!mainStore.config.enableUpnp) {
@@ -1618,7 +1312,7 @@
 		if (mainStore.config.disableRelayData) {
 			args.push("--disable-relay-data", "true");
 		}
-		if (mainStore.config.bindDeviceEnable) {
+		if (isWindows && mainStore.config.bindDeviceEnable) {
 			args.push("--bind-device", "true");
 		}
 		if (mainStore.proxyForwardBySystem) {
@@ -1655,6 +1349,9 @@
 
 	const ipReset = async () => {
 		data.isSuccessGetIp = false;
+		peers.value = [];
+		startedAt.value = 0;
+		elapsed.value = 0;
 		if (mainStore.config.dhcp) {
 			mainStore.config.ipv4 = "";
 		}
@@ -1663,7 +1360,11 @@
 	};
 
 	const reset = async () => {
+		await unListenAll();
+		await stopPublishedRoom();
+		data.startLoading = false;
 		data.isStart = false;
+		mainStore.networkRunning = false;
 		const memberDialog = await getAllWebviewWindows();
 		const memberDialogs = memberDialog.filter(item => item.label === "member");
 		if (memberDialogs && memberDialogs.length > 0) {
@@ -1675,33 +1376,60 @@
 				}
 			}
 		}
-		await unListenAll();
 		await ipReset();
 	};
 
+	const stopPublishedRoom = async () => {
+		const id = mainStore.lobby.roomId;
+		if (!id || !mainStore.lobby.autoRemove) return;
+		mainStore.lobby.roomId = "";
+		try {
+			await removeRoom(id);
+		} catch (error) {
+			console.warn("房间下架请求失败，将在心跳超时后下架", error);
+		}
+	};
 	const handleConnection = async () => {
+		if (!isTauri()) {
+			ElMessage.info("请在桌面客户端启动联机，浏览器中可预览界面");
+			return;
+		}
+		if (data.startLoading) return;
 		if (data.isStart) {
-			await reset();
-		} else {
-			await setTrayTooltip(tray, "请求联机中...");
-			const args = await getArgs();
-			if (!args || args.length <= 0) {
+			try {
 				await reset();
-				return;
+			} catch (error) {
+				ElMessage.error(String(error));
 			}
-			if (args[0] === "-c") {
-				ElMessage.warning({
-					message: "使用配置文件中.",
-					duration: 5000
-				});
-			}
-			data.log = ""; //清空日志
+		} else {
 			data.startLoading = true;
-			await unListenAll();
-			await listenObj.listenOutput();
-			await invoke("run_command", {
-				args
-			});
+			failure.value = "";
+			try {
+				await setTrayTooltip(tray, "请求联机中...");
+				const args = await getArgs();
+				if (!args || args.length <= 0) {
+					await reset();
+					return;
+				}
+				if (args[0] === "-c") {
+					ElMessage.warning({
+						message: "使用配置文件中.",
+						duration: 5000
+					});
+				}
+				data.startLoading = true;
+				await unListenAll();
+				await listenObj.listenOutput();
+				mainStore.networkRunning = true;
+				await invoke("run_command", { args });
+				data.isStart = true;
+				data.startLoading = false;
+			} catch (error) {
+				data.startLoading = false;
+				await reset();
+				failure.value = String(error);
+				ElMessage.error(String(error));
+			}
 		}
 	};
 
@@ -1710,18 +1438,18 @@
 		if (command === "toml") {
 			configStart.visible = true;
 			const path = import.meta.env.VITE_CONFIG_PATH;
-			const isExists = await exists(path, { baseDir: BaseDirectory.Resource });
+			const isExists = await exists(path, { baseDir: dataBaseDir() });
 			if (!isExists) {
 				mainStore.configStartEnable = false;
 				mainStore.configPath = "";
 				try {
-					await mkdir(path, { baseDir: BaseDirectory.Resource, recursive: true });
+					await mkdir(path, { baseDir: dataBaseDir(), recursive: true });
 				} catch (err) {
 					console.error(err);
 					return;
 				}
 			}
-			const entries = await readDir(path, { baseDir: BaseDirectory.Resource });
+			const entries = await readDir(path, { baseDir: dataBaseDir() });
 			configStart.list = entries
 				.filter(item => {
 					const nameLower = item.name.toLowerCase();
@@ -1736,6 +1464,7 @@
 			try {
 				const {
 					protocol,
+					peerUrls,
 					serverUrl,
 					networkName,
 					networkPassword,
@@ -1770,6 +1499,7 @@
 						JSON.stringify({
 							config: {
 								protocol,
+								peerUrls,
 								serverUrl,
 								networkName,
 								networkPassword,
@@ -1831,16 +1561,16 @@
 		if (command === "config_admin") {
 			configAdminData.visible = true;
 			const path = import.meta.env.VITE_CONFIG_ADMIN_PATH;
-			const isExists = await exists(path, { baseDir: BaseDirectory.Resource });
+			const isExists = await exists(path, { baseDir: dataBaseDir() });
 			if (!isExists) {
 				try {
-					await mkdir(path, { baseDir: BaseDirectory.Resource, recursive: true });
+					await mkdir(path, { baseDir: dataBaseDir(), recursive: true });
 				} catch (err) {
 					console.error(err);
 					return;
 				}
 			}
-			const entries = await readDir(path, { baseDir: BaseDirectory.Resource });
+			const entries = await readDir(path, { baseDir: dataBaseDir() });
 			configAdminData.list = entries
 				.filter(item => item.isFile)
 				.map(item => ({
@@ -1849,7 +1579,8 @@
 				})) as any;
 		}
 		if (command === "save_config_admin") {
-			const config = btoa(encodeURIComponent(JSON.stringify(mainStore.$state)));
+			const { coordinator: _identity, lobby: _lobby, networkRunning: _runtime, ...roomConfig } = mainStore.$state;
+			const config = btoa(encodeURIComponent(JSON.stringify(roomConfig)));
 			const [error, { value = "" } = {}] = await ATJ(
 				ElMessageBox.prompt("请输入配置的存储名", "提示", {
 					confirmButtonText: "保存",
@@ -1869,16 +1600,16 @@
 			if (!error) {
 				const dir = import.meta.env.VITE_CONFIG_ADMIN_PATH;
 				const filePath = `${dir}${value}`;
-				const isExistsDir = await exists(dir, { baseDir: BaseDirectory.Resource });
+				const isExistsDir = await exists(dir, { baseDir: dataBaseDir() });
 				if (!isExistsDir) {
 					try {
-						await mkdir(dir, { baseDir: BaseDirectory.Resource, recursive: true });
+						await mkdir(dir, { baseDir: dataBaseDir(), recursive: true });
 					} catch (err) {
 						console.error(err);
 						return;
 					}
 				}
-				const isExists = await exists(filePath, { baseDir: BaseDirectory.Resource });
+				const isExists = await exists(filePath, { baseDir: dataBaseDir() });
 				let allowWrite = true;
 				if (isExists) {
 					const [err] = await ElConfirmPrimary("配置名已存在，是否覆盖?", "提示", {
@@ -1893,7 +1624,7 @@
 					let encoder = new TextEncoder();
 					let data = encoder.encode(config);
 					// console.log(filePath, data);
-					await writeFile(filePath, data, { baseDir: BaseDirectory.Resource });
+					await writeFile(filePath, data, { baseDir: dataBaseDir() });
 					ElMessage.success("保存成功");
 				}
 			}
@@ -1904,8 +1635,8 @@
 				"gameList",
 				{
 					title: "本地游戏列表",
-					width: 800,
-					height: 400,
+					width: 600,
+					height: 720,
 					minWidth: 800,
 					minHeight: 400,
 					resizable: true,
@@ -1950,7 +1681,7 @@
 		});
 		if (err) return;
 		try {
-			await removeFile(path, { baseDir: BaseDirectory.Resource });
+			await removeFile(path, { baseDir: dataBaseDir() });
 			ElMessage.success("删除成功");
 			configAdminData.fileName = "";
 			await handleStartCommand("config_admin");
@@ -1966,7 +1697,7 @@
 		// import.meta.env.VITE_CONFIG_ADMIN_PATH
 		const [err] = await ElConfirmPrimary("会覆盖当前配置,确定切换吗?");
 		if (err) return;
-		const base64U8Arrray = await readFile(path, { baseDir: BaseDirectory.Resource });
+		const base64U8Arrray = await readFile(path, { baseDir: dataBaseDir() });
 		const decoder = new TextDecoder("utf-8");
 		try {
 			if (data.isStart) {
@@ -1974,7 +1705,8 @@
 				await reset();
 			}
 			const json: typeof mainStore.$state = JSON.parse(decodeURIComponent(atob(decoder.decode(base64U8Arrray))));
-			mainStore.$patch(json);
+			const { coordinator: _identity, lobby: _lobby, networkRunning: _runtime, ...roomConfig } = json;
+			mainStore.$patch(roomConfig);
 			ElMessage.success("切换成功");
 			configAdminData.visible = false;
 		} catch (err) {
@@ -1993,7 +1725,10 @@
 			payload.config.serverUrl = Array.isArray(payload?.config?.serverUrl)
 				? payload?.config?.serverUrl
 				: typeof payload?.config?.serverUrl == "string"
-					? [payload?.config?.serverUrl.split(",")]
+					? payload.config.serverUrl
+							.split(",")
+							.map((url: string) => url.trim())
+							.filter(Boolean)
 					: typeof mainStore.config.serverUrl == "string"
 						? [mainStore.config.serverUrl]
 						: [];
@@ -2016,12 +1751,12 @@
 
 	const initConfigDir = async () => {
 		const path = import.meta.env.VITE_CONFIG_PATH;
-		const isExists = await exists(path, { baseDir: BaseDirectory.Resource });
+		const isExists = await exists(path, { baseDir: dataBaseDir() });
 		if (!isExists) {
 			mainStore.configStartEnable = false;
 			mainStore.configPath = "";
 			try {
-				await mkdir(path, { baseDir: BaseDirectory.Resource });
+				await mkdir(path, { baseDir: dataBaseDir() });
 			} catch (err) {
 				console.error(err);
 			}
@@ -2032,19 +1767,16 @@
 		const resourceDir = await getResourceDir();
 		const configPath = await join(resourceDir, import.meta.env.VITE_CONFIG_PATH);
 		// console.error(configPath);
-		await Command.create("explorer", [configPath]).execute();
+		await openFolder(configPath);
 	};
 	const openConfigAdminDir = async () => {
 		const resourceDir = await getResourceDir();
 		const configPath = await join(resourceDir, import.meta.env.VITE_CONFIG_ADMIN_PATH);
 		// console.error(configPath);
-		await Command.create("explorer", [configPath]).execute();
+		await openFolder(configPath);
 	};
 
 	const handleShowMemberDialog = async () => {
-		if (!data.isStart) {
-			return ElMessage.warning("请先启动联机");
-		}
 		// if (!mainStore.config.ipv4) {
 		// 	return ElMessage.warning("请等待获取IP");
 		// }
@@ -2053,8 +1785,8 @@
 			"member",
 			{
 				title: "成员列表",
-				width: 875,
-				height: 380,
+				width: 600,
+				height: 720,
 				url: "#/member"
 			},
 			() => {
@@ -2069,59 +1801,35 @@
 	const handleShowLogDialog = async () => {
 		await etWindows(
 			"log",
-			{
-				title: "联机日志",
-				width: 600,
-				height: 380,
-				resizable: false,
-				url: "#/log"
-			},
-			(_, appWindow) => {
+			{ title: "联机日志", width: 600, height: 720, minWidth: 520, minHeight: 480, resizable: true, url: "#/log" },
+			() => {
 				data.logVisible = true;
-				logsTimer && clearInterval(logsTimer);
-				logsTimer = setInterval(() => {
-					appWindow.emitTo({ kind: "WebviewWindow", label: "log" }, "logs", data.log);
-				}, 650);
 			},
 			() => {
-				logsTimer && clearInterval(logsTimer);
 				data.logVisible = false;
 			}
 		);
 	};
-
 	const handleShowCidrDialog = async () => {
 		await etWindows(
 			"cidr",
-			{
-				title: "子网代理",
-				width: 600,
-				height: 380,
-				resizable: false,
-				url: "#/cidr"
-			},
-			(_, appWindow) => {
+			{ title: "子网代理", width: 600, height: 720, minWidth: 520, minHeight: 480, resizable: true, url: "#/cidr" },
+			() => {
 				data.cidrVisible = true;
-				cidrTimer && clearInterval(cidrTimer);
-				cidrTimer = setInterval(() => {
-					appWindow.emitTo({ kind: "WebviewWindow", label: "cidr" }, "route", data.isStart);
-				}, 650);
 			},
 			() => {
-				cidrTimer && clearInterval(cidrTimer);
 				data.cidrVisible = false;
 			}
 		);
 	};
-
 	const handleShowAdvanceDialog = async () => {
 		await etWindows(
 			"advance",
 			{
 				title: "高级选项",
 				width: 600,
-				height: 380,
-				resizable: false,
+				height: 720,
+				resizable: true,
 				url: "#/advance"
 			},
 			(_, appWindow) => {
@@ -2138,8 +1846,8 @@
 			"tool",
 			{
 				title: "增强工具",
-				width: 460,
-				height: 480,
+				width: 600,
+				height: 720,
 				resizable: true,
 				url: "#/tool"
 			},
@@ -2155,52 +1863,12 @@
 	const handleShowServerDialog = async () => {
 		await etWindows(
 			"server",
-			{
-				title: "自建服务器",
-				minWidth: 550,
-				minHeight: 460,
-				width: 550,
-				height: 460,
-				resizable: true,
-				url: "#/server"
-			},
-			(_, appWindow) => {
+			{ title: "自建服务器", width: 600, height: 720, minWidth: 520, minHeight: 480, resizable: true, url: "#/server" },
+			() => {
 				data.serverVisible = true;
-				serverLogsTimer && clearInterval(serverLogsTimer);
-				serverLogsTimer = setInterval(() => {
-					appWindow.emitTo({ kind: "WebviewWindow", label: "server" }, "server_logs", {
-						log: data.serverLog,
-						threadId: listenObj.server_thread_id.value
-					});
-				}, 650);
 			},
 			() => {
-				serverLogsTimer && clearInterval(serverLogsTimer);
 				data.serverVisible = false;
-			}
-		);
-	};
-
-	const storageDialog = async () => {
-		await etWindows(
-			"storage-listener",
-			{
-				title: "存储监听",
-				minWidth: 0,
-				minHeight: 0,
-				width: 0,
-				height: 0,
-				x: 9999,
-				y: 9999,
-				resizable: false,
-				transparent: true,
-				hiddenTitle: true,
-				alwaysOnBottom: true,
-				visible: false,
-				url: "#/storage-listener"
-			},
-			dialog => {
-				dialog.hide();
 			}
 		);
 	};

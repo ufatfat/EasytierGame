@@ -17,6 +17,8 @@ const fs = require("fs");
 const path = require("path");
 const archiver = require("archiver");
 
+fs.mkdirSync(path.join(__dirname, releaseZipDir), { recursive: true });
+
 const output = fs.createWriteStream(path.join(__dirname, releaseZip));
 const archive = archiver("zip", {
 	zlib: { level: 8 } // Sets the compression level.

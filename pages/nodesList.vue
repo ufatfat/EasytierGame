@@ -1,7 +1,20 @@
 <template>
-	<div class="relative flex h-full flex-col flex-wrap gap-[0] overflow-hidden">
+	<div
+		class="relative flex h-full flex-col flex-wrap gap-[0] overflow-hidden"
+		:class="{ '!flex-nowrap': usesNativeWindowControls }"
+	>
+		<PanelHeader
+			v-if="usesNativeWindowControls"
+			class="w-full"
+			icon="server"
+			title="公共服务器节点"
+			subtitle="选择可用节点作为联机入口"
+		/>
 		<div class="flex h-[40px] w-full flex-nowrap items-center gap-[0_8px]">
-			<div class="ml-[5px] mr-auto flex">
+			<div
+				v-if="!usesNativeWindowControls"
+				class="ml-[5px] mr-auto flex"
+			>
 				<ElText class="text-lg font-semibold">公共服务器节点列表</ElText>
 			</div>
 			<div class="flex w-fit flex-nowrap items-center gap-[0_8px]">
@@ -155,6 +168,8 @@
 </template>
 
 <script setup lang="ts">
+	import PanelHeader from "@/components/PanelHeader.vue";
+	import { usesNativeWindowControls } from "@/composables/platform";
 	import useMainStore from "@/stores/index";
 	import { invoke } from "@tauri-apps/api/core";
 	import { reactive, onMounted, onBeforeUnmount, ref, useTemplateRef, computed, nextTick } from "vue";
@@ -187,7 +202,7 @@
 	const tableRef = useTemplateRef<TableInstance>("tableRef");
 
 	// 定时器
-	let refreshTimer: number | null = null;
+	let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
 	// 获取使用率颜色
 	const getUsageColor = (percentage: number) => {

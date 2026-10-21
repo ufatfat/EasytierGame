@@ -9,7 +9,7 @@ const darkConfig = useDark({
 });
 const toggleDark = useToggle(darkConfig);
 export const initTheme = (isDark: boolean) => {
-	if (isDark && isFunction(toggleDark)) {
+	if (isFunction(toggleDark)) {
 		toggleDark(isDark);
 	}
 };

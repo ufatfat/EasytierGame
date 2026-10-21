@@ -1,3 +1,4 @@
+import { dataBaseDir } from "@/composables/platform";
 import { BaseDirectory, writeTextFile } from "@tauri-apps/plugin-fs";
 import useMainStore from "@/stores/index";
 import { ElMessage } from "element-plus";
@@ -51,7 +52,7 @@ export const updateConfigJson = async (configJsonSeverUrl?: ConfigServerUrlType 
 		await writeTextFile(
 			path,
 			JSON.stringify({ serverUrl: writeServerUrl, enableCustomListener, customListenerData: writeCustomListenerData, ...otherConfig }, null, 4),
-			{ baseDir: BaseDirectory.Resource }
+			{ baseDir: dataBaseDir() }
 		);
 	} catch (err) {
 		console.error(err);

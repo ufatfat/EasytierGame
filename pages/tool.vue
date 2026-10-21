@@ -1,286 +1,286 @@
 <template>
-	<div class="h-full overflow-auto">
-		<ElTabs
-			v-model="data.activeTab"
-			@tab-change="handleTabsChange"
-			class="h-full"
+	<section class="panel-window">
+		<PanelHeader
+			icon="wrench"
+			title="联机工具"
+			subtitle="按顺序排查，解决找不到房间和连接问题"
+		/>
+		<div
+			v-if="!isWindows"
+			class="empty-state"
 		>
-			<ElTabPane
-				label="联机失败解决办法"
-				name="netcard"
-				class="flex h-full flex-col"
-			>
-				<!-- <div>
+			<AppIcon
+				name="monitor"
+				:size="32"
+			/>
+			<h2>Windows 专属工具</h2>
+			<p>macOS 可直接在主窗口启动联机</p>
+		</div>
+		<div
+			v-else
+			class="panel-scroll tools-content"
+		>
+			<div class="inline-notice">
+				<AppIcon
+					name="info"
+					:size="14"
+				/>
+				找不到游戏房间？建议按下面的顺序逐步排查
+			</div>
+			<article class="tool-card surface-card">
+				<div class="tool-heading">
+					<span class="step">1</span>
 					<div>
-						<ElTooltip
-							content="找不到游戏房间时，就开启它后再尝试搜索房间(默认开启)
-                        例如: 一个游戏玩家，有时通过本地局域网联机，有时通过某些联机工具进行联机，但是他只能在其中一个联机方式里看到朋友的游戏房间，而另一个里看不到，这时就可以使用这个工具，让他在两个地方都能看到游戏房间"
-						>
-							<ElText>
-								方案1
-								<ElIcon class="ml-[3px]"><QuestionFilled /></ElIcon>
-							</ElText>
-						</ElTooltip>
+						<h2>局域网广播</h2>
+						<p>让游戏发现虚拟局域网中的其他玩家</p>
 					</div>
-					<ElLink
-						class="mr-[10px] !text-[15px]"
-						type="info"
-						underline="never"
-						@click="open('https://github.com/dechamps/WinIPBroadcast/releases/tag/winipbroadcast-1.6')"
-					>
-						WinIPBroadcast
-					</ElLink>
-					<ElSwitch
-						inline-prompt
-						:model-value="mainStore.winipBcStart"
-						@change="handleWinipBcStart"
-						size="small"
-						label="WinIPBroadcast"
-						active-text="已开启"
-						inactive-text="已关闭"
-					></ElSwitch>
-				</div> -->
-				<div>
-					<ElTooltip
-						content="使用ForceBindIP启动应用 (强制绑定IP或者网卡)，如果还没有启动联机，请先启动联机，联机成功后，点击刷新获取easytier生成的网卡"
-					>
-						<ElText>
-							方案1
-							<ElIcon class="ml-[3px]"><QuestionFilled /></ElIcon>
-						</ElText>
-					</ElTooltip>
+					<span class="ui-tag success">推荐</span>
 				</div>
-				<div>
+				<div class="tool-setting">
+					<span>
+						Windows UDP 广播中继
+						<small>使用 EasyTier 内核广播能力，下次联机时生效</small>
+					</span>
+					<UiSwitch
+						v-model="mainStore.config.enableUdpBroadcastRelay"
+						label="Windows UDP 广播中继"
+					/>
+				</div>
+			</article>
+			<article class="tool-card surface-card">
+				<div class="tool-heading">
+					<span class="step">2</span>
 					<div>
-						<ElLink
-							class="!text-[15px]"
-							type="info"
-							underline="never"
-							@click="open('https://r1ch.net/projects/forcebindip')"
-						>
-							ForceBindIP
-						</ElLink>
+						<h2>网卡优先级</h2>
+						<p>降低联机网卡跃点，优先使用虚拟网络</p>
 					</div>
-					<div>
-						<ElRadioGroup
-							class="mr-[30px]"
-							v-model="mainStore.forceBindIpBit"
-						>
-							<ElRadio
-								label="32位"
-								value="32"
-							></ElRadio>
-							<ElRadio
-								label="64位"
-								value="64"
-							></ElRadio>
-						</ElRadioGroup>
-						<ElTooltip
-							placement="top"
-							content="如果目标应用程序在启动时崩溃或出现其他意外行为，请尝试开启它，ForceBindIP 加载程序将等待应用程序进入其消息循环后再注入拦截 DLL"
-						>
-							<ElCheckbox
-								v-model="mainStore.delayInjectDll"
-								label="延迟注入DLL"
-							></ElCheckbox>
-						</ElTooltip>
-					</div>
-					<div class="flex items-center gap-[5px]">
-						<ElSelect
-							placeholder="请输入IP地址或选择网卡"
-							v-model="mainStore.forceBindInput"
-							filterable
-							allow-create
-							no-data-text="暂无网卡数据，请尝试刷新"
-						>
-							<ElOption
-								v-for="guid in data.guids"
-								:key="guid[0]"
-								:label="guid[1]"
-								:value="guid[0]"
-							></ElOption>
-						</ElSelect>
-						<ElButton @click="getGuids">刷新</ElButton>
-					</div>
-					<div class="mt-[5px] flex items-center gap-[5px]">
-						<ElInput
-							placeholder="请选择或输入应用程序路径"
-							:disabled="data.forceBindStart"
-							v-model="mainStore.forceBindFile"
-						></ElInput>
-						<div class="flex items-center">
-							<ElButton
-								@click="handleBrowser"
-								:disabled="data.forceBindStart"
-							>
-								浏览
-							</ElButton>
-							<ElButton
-								:disabled="data.forceBindStart"
-								@click="startForceBindIp"
-								type="primary"
-							>
-								启动
-							</ElButton>
-						</div>
-					</div>
-				</div>
-				<div>
-					<!-- const guids = await invoke<string[]>("get_network_adapter_guids"); -->
-				</div>
-				<div>
-					<ElTooltip content="设置网卡的跃点，提升网卡优先级，尝试将您联机使用的网卡跃点设置为最小，请先查询网卡信息">
-						<ElText>
-							方案2
-							<ElIcon class="ml-[3px]"><QuestionFilled /></ElIcon>
-						</ElText>
-					</ElTooltip>
-				</div>
-				<div class="mt-[5px] flex items-center">
-					<ElButton
+					<button
+						class="ui-button"
 						@click="initNetCardInfo"
-						size="small"
-						type="primary"
 					>
-						查询网卡信息
-					</ElButton>
-					<div
-						v-if="data.row.name"
-						class="ml-auto flex flex-nowrap items-center gap-[10px]"
-					>
-						<ElTooltip content="跃点越小，网卡优先级越高，范围(1-9999)">
-							<ElInput
-								class="!w-[80px]"
-								autofocus
-								size="small"
-								v-model="data.row.metric"
-								placeholder="请输入跃点"
-							/>
-						</ElTooltip>
-						<ElButton
-							type="success"
-							size="small"
-							@click="handleSaveMetric"
-						>
-							保存
-						</ElButton>
-					</div>
+						<AppIcon
+							name="refresh"
+							:size="13"
+						/>
+						查询
+					</button>
 				</div>
-				<div class="mt-[5px] flex-1 overflow-auto">
-					<ElTable
-						height="100%"
-						empty-text="暂无数据"
-						highlight-current-row
-						:data="data.netcardList"
-						@row-click="handleRowClick"
-						border
+				<ElTable
+					v-if="data.netcardList.length"
+					:data="data.netcardList"
+					highlight-current-row
+					@row-click="handleRowClick"
+					max-height="180"
+				>
+					<ElTableColumn
+						prop="name"
+						label="网卡名称"
+					/>
+					<ElTableColumn
+						prop="metric"
+						label="跃点"
+						width="64"
+					/>
+				</ElTable>
+				<div
+					v-if="data.row.name"
+					class="tool-controls"
+				>
+					<span>{{ data.row.name }}</span>
+					<input
+						v-model="data.row.metric"
+						type="number"
+						min="1"
+						max="9999"
+						class="ui-input mono"
+					/>
+					<button
+						class="ui-button primary"
+						@click="handleSaveMetric"
 					>
-						<ElTableColumn
-							sortable
-							label="网卡名"
-							prop="name"
-						></ElTableColumn>
-						<ElTableColumn
-							sortable
-							label="跃点"
-							prop="metric"
-						></ElTableColumn>
-					</ElTable>
+						保存
+					</button>
 				</div>
-			</ElTabPane>
-			<ElTabPane
-				label="防火墙"
-				name="firewall"
-				class="flex h-full flex-col"
-			>
-				<div class="flex flex-col items-center">
-					<div class="mb-[10px]">
-						<ElButton
-							type="warning"
-							size="small"
-							@click.stop="handleCloseAllFireWall"
-						>
-							一键关闭防火墙
-						</ElButton>
-					</div>
-					<div class="mb-[10px]">
-						<ElText class="!mx-[10px]">域防火墙</ElText>
-						<ElTag :type="data.firewallStatus.domain ? 'danger' : 'success'">
-							{{ data.firewallStatus.domain ? "已开启" : "已关闭" }}
-						</ElTag>
-					</div>
-					<div class="mb-[10px]">
-						<ElText class="!mx-[10px]">公用防火墙</ElText>
-						<ElTag :type="data.firewallStatus.public ? 'danger' : 'success'">
-							{{ data.firewallStatus.public ? "已开启" : "已关闭" }}
-						</ElTag>
-					</div>
+				<p
+					v-else
+					class="tool-note"
+				>
+					查询网卡后选择 EasyTier 虚拟网卡，将跃点设置为 1
+				</p>
+			</article>
+			<article class="tool-card surface-card">
+				<div class="tool-heading">
+					<span class="step">3</span>
 					<div>
-						<ElText class="!mx-[10px]">专用防火墙</ElText>
-						<ElTag :type="data.firewallStatus.dedicated ? 'danger' : 'success'">
-							{{ data.firewallStatus.dedicated ? "已开启" : "已关闭" }}
-						</ElTag>
+						<h2>防火墙检查</h2>
+						<p>确认 Windows 防火墙没有拦截游戏和联机程序</p>
+					</div>
+					<button
+						class="icon-button"
+						aria-label="刷新防火墙状态"
+						@click="initFirewall"
+					>
+						<AppIcon
+							name="refresh"
+							:size="14"
+						/>
+					</button>
+				</div>
+				<div class="firewall-states">
+					<span
+						v-for="item in [
+							['domain', '域网络'],
+							['public', '公用网络'],
+							['dedicated', '专用网络']
+						]"
+						:key="item[0]"
+					>
+						{{ item[1] }}
+						<b
+							class="ui-tag"
+							:class="data.firewallStatus[item[0]] ? 'success' : ''"
+						>
+							{{ data.firewallStatus[item[0]] ? "已开启" : "已关闭" }}
+						</b>
+					</span>
+				</div>
+				<div class="inline-notice warning">
+					<AppIcon
+						name="warning"
+						:size="14"
+					/>
+					建议先允许游戏通过防火墙。临时关闭后请及时恢复。
+				</div>
+				<button
+					class="ui-button danger"
+					@click="handleCloseAllFireWall"
+				>
+					临时关闭防火墙
+				</button>
+			</article>
+			<article class="tool-card surface-card">
+				<div class="tool-heading">
+					<span class="step">4</span>
+					<div>
+						<h2>Ping 测试</h2>
+						<p>测试到其他玩家虚拟 IP 的连通性</p>
 					</div>
 				</div>
-				<ElDivider>Ping测试</ElDivider>
-				<div class="flex items-center gap-[10px]">
-					<ElInput
-						style="width: 150px"
-						size="small"
+				<div class="tool-controls">
+					<input
 						v-model="data.pingIp"
-						placeholder="请输入IP地址"
+						class="ui-input mono"
+						placeholder="对方虚拟 IP"
+						aria-label="Ping 目标 IP"
 					/>
 					<ElInputNumber
-						controls-position="right"
-						size="small"
-						:precision="0"
 						v-model="data.pingNum"
 						:min="1"
 						:max="10"
-					>
-						<template #suffix>
-							<span>次</span>
-						</template>
-					</ElInputNumber>
-					<ElButton
+						:precision="0"
+						controls-position="right"
 						size="small"
+					/>
+					<button
+						class="ui-button primary"
 						:disabled="data.isPing"
 						@click="handleTestPing('v4')"
 					>
-						Ping一下
-					</ElButton>
-					<!-- <ElButton
-						size="small"
-						:disabled="data.isPing"
-						@click="handleTestPing('v6')"
-					>
-						Ping一下(v6)
-					</ElButton> -->
+						{{ data.isPing ? "测试中…" : "开始测试" }}
+					</button>
 				</div>
-				<div class="mt-[5px] flex-1 overflow-auto">
-					<ElInput
-						placeholder="日志信息"
-						type="textarea"
-						:autosize="{ minRows: 9 }"
-						resize="none"
-						v-model="data.pingLog"
-					/>
-				</div>
-			</ElTabPane>
-		</ElTabs>
-	</div>
+				<pre
+					v-if="data.pingLog"
+					class="ping-output mono"
+					>{{ data.pingLog }}</pre
+				>
+			</article>
+			<article class="tool-card surface-card">
+				<details>
+					<summary>
+						<div class="tool-heading">
+							<span class="step">5</span>
+							<div>
+								<h2>ForceBindIP</h2>
+								<p>强制游戏绑定联机 IP 或网卡</p>
+							</div>
+							<span class="ui-tag warning">进阶</span>
+							<AppIcon
+								name="chevron-down"
+								:size="14"
+							/>
+						</div>
+					</summary>
+					<div class="forcebind-form">
+						<div class="tool-controls">
+							<ElRadioGroup v-model="mainStore.forceBindIpBit">
+								<ElRadio value="32">32 位</ElRadio>
+								<ElRadio value="64">64 位</ElRadio>
+							</ElRadioGroup>
+							<ElCheckbox v-model="mainStore.delayInjectDll">延迟注入 DLL</ElCheckbox>
+						</div>
+						<div class="tool-controls">
+							<ElSelect
+								v-model="mainStore.forceBindInput"
+								filterable
+								allow-create
+								placeholder="IP 地址或网卡"
+							>
+								<ElOption
+									v-for="guid in data.guids"
+									:key="guid[0]"
+									:label="guid[1]"
+									:value="guid[0]"
+								/>
+							</ElSelect>
+							<button
+								class="ui-button"
+								@click="getGuids"
+							>
+								刷新
+							</button>
+						</div>
+						<div class="tool-controls">
+							<input
+								v-model="mainStore.forceBindFile"
+								class="ui-input"
+								placeholder="应用程序路径"
+							/>
+							<button
+								class="ui-button"
+								@click="handleBrowser"
+							>
+								浏览
+							</button>
+							<button
+								class="ui-button primary"
+								:disabled="data.forceBindStart"
+								@click="startForceBindIp"
+							>
+								启动
+							</button>
+						</div>
+					</div>
+				</details>
+			</article>
+		</div>
+	</section>
 </template>
 <script setup lang="ts">
+	import AppIcon from "@/components/AppIcon.vue";
+	import PanelHeader from "@/components/PanelHeader.vue";
+	import UiSwitch from "@/components/UiSwitch.vue";
+	import { isWindows, dataBaseDir } from "@/composables/platform";
 	import { open, Command } from "@tauri-apps/plugin-shell";
 	import { open as dialogOpen } from "@tauri-apps/plugin-dialog";
-	import { ElMessage, type TabPaneName } from "element-plus";
+	import { ElMessage, ElMessageBox, type TabPaneName } from "element-plus";
 	import { QuestionFilled } from "@element-plus/icons-vue";
 	import { onMounted, reactive } from "vue";
 	import useMainStore from "@/stores/index";
 	import { handleWinipBcStart, initStartWinIpBroadcast } from "@/composables/netcard";
 	import { isValidIP } from "~/utils";
 	import { dataSubscribe } from "~/composables/windows";
-	import { invoke } from "@tauri-apps/api/core";
+	import { invoke, isTauri } from "@tauri-apps/api/core";
 	import { BaseDirectory, exists } from "@tauri-apps/plugin-fs";
 
 	const mainStore = useMainStore();
@@ -306,19 +306,26 @@
 		forceBindStart: false
 	});
 
-
 	const handleCloseAllFireWall = async () => {
 		try {
-				const output = await Command.create("netsh", ["advfirewall", "set", "allprofiles", "state", "off"], {
-					encoding: "gb2312"
-				}).execute();
-				ElMessage.success("关闭成功");
-				await initFirewall();
-			} catch (err) {
-				ElMessage.error(`关闭失败${err}`);
-				console.error(err);
-			}
-	}
+			await ElMessageBox.confirm("这会关闭所有网络配置文件的 Windows 防火墙。完成排查后请在系统安全设置中重新开启。", "关闭防火墙", {
+				type: "warning",
+				confirmButtonText: "关闭防火墙"
+			});
+		} catch {
+			return;
+		}
+		try {
+			const output = await Command.create("netsh", ["advfirewall", "set", "allprofiles", "state", "off"], {
+				encoding: "gb2312"
+			}).execute();
+			ElMessage.success("关闭成功");
+			await initFirewall();
+		} catch (err) {
+			ElMessage.error(`关闭失败${err}`);
+			console.error(err);
+		}
+	};
 
 	const handleTabsChange = async (tabPaneName: TabPaneName) => {
 		if (tabPaneName === "netcard") {
@@ -333,6 +340,8 @@
 	};
 
 	const handleSaveMetric = async () => {
+		if (!Number.isInteger(Number(data.row.metric)) || Number(data.row.metric) < 1 || Number(data.row.metric) > 9999)
+			return ElMessage.error("跃点需为 1–9999 的整数");
 		if (data.row.metric && data.row.name) {
 			try {
 				const output = await Command.create("netsh", ["interface", "ipv4", "set", "interface", data.row.name, "metric=", data.row.metric], {
@@ -352,12 +361,12 @@
 		});
 	};
 
-	const handleTestPing = async (type: 'v4' | 'v6' = 'v4') => {
+	const handleTestPing = async (type: "v4" | "v6" = "v4") => {
 		// const is = isValidIP(data.pingIp);
-		if (data.pingIp) {
+		if (isValidIP(data.pingIp)) {
 			data.pingLog = "";
 			data.isPing = true;
-			const args = type === 'v4' ? ["-n", "1", data.pingIp] : ["-6", '-n', "1", data.pingIp]
+			const args = type === "v4" ? ["-n", "1", data.pingIp] : ["-6", "-n", "1", data.pingIp];
 			try {
 				for (let i = 0; i < data.pingNum; i++) {
 					const output = await Command.create("ping", args, {
@@ -465,7 +474,7 @@
 		}
 
 		const forceBindIpExe = mainStore.forceBindIpBit == "32" ? "ForceBindIP" : "ForceBindIP64";
-		const isExists = await exists(`easytier/tool/${forceBindIpExe}.exe`, { baseDir: BaseDirectory.Resource });
+		const isExists = await exists(`easytier/tool/${forceBindIpExe}.exe`, { baseDir: dataBaseDir() });
 		if (!isExists) {
 			return ElMessage.error("forcebindIP文件不存在");
 		}
@@ -501,10 +510,128 @@
 	};
 
 	onMounted(() => {
+		if (!isWindows || !isTauri()) return;
 		data.pingIp = mainStore.config.ipv4;
 		// initStartWinIpBroadcast();
 		getGuids();
+		void initFirewall();
 	});
-	
+
 	dataSubscribe();
 </script>
+
+<style scoped>
+	.tools-content {
+		padding: 16px 20px;
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+	}
+	.tool-card {
+		padding: 14px;
+		flex-shrink: 0;
+	}
+	.tool-heading {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+	}
+	.step {
+		width: 26px;
+		height: 26px;
+		border-radius: 8px;
+		background: var(--primary-soft);
+		color: var(--primary);
+		font: 600 12px var(--mono);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+	.tool-heading > div {
+		flex: 1;
+	}
+	.tool-heading h2 {
+		font-size: 13px;
+		font-weight: 600;
+	}
+	.tool-heading p,
+	.tool-note {
+		font-size: 10px;
+		line-height: 18px;
+		color: var(--text-3);
+		margin-top: 3px;
+	}
+	.tool-setting {
+		margin-top: 14px;
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		font-size: 12px;
+	}
+	.tool-setting small {
+		display: block;
+		font-size: 10px;
+		color: var(--text-3);
+		margin-top: 4px;
+	}
+	.tool-controls {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		margin-top: 12px;
+	}
+	.tool-controls > .ui-input {
+		min-width: 0;
+		flex: 1;
+		height: 32px;
+		font-size: 11px;
+	}
+	.tool-controls > span {
+		font-size: 11px;
+	}
+	.tool-controls .el-input-number {
+		width: 80px;
+		flex-shrink: 0;
+	}
+	.tool-controls .ui-button {
+		white-space: nowrap;
+	}
+	.firewall-states {
+		display: flex;
+		gap: 16px;
+		padding: 14px 0;
+	}
+	.firewall-states > span {
+		font-size: 10px;
+		color: var(--text-2);
+		display: flex;
+		align-items: center;
+		gap: 6px;
+	}
+	.tool-card .inline-notice {
+		font-size: 10px;
+		margin: 0 0 12px;
+	}
+	.tool-note {
+		margin-top: 12px;
+	}
+	.ping-output {
+		white-space: pre-wrap;
+		font-size: 11px;
+		color: var(--text-2);
+		background: var(--console);
+		padding: 12px;
+		margin-top: 12px;
+		border-radius: 8px;
+	}
+	.tool-card summary {
+		list-style: none;
+		cursor: pointer;
+	}
+	.tool-card summary::-webkit-details-marker {
+		display: none;
+	}
+	.forcebind-form {
+		padding-top: 4px;
+	}
+</style>

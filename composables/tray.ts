@@ -1,10 +1,12 @@
+import { isTauri } from "@tauri-apps/api/core";
+import { isWindows, getDataDir as getResourceDir } from "@/composables/platform";
 import { Menu, MenuItem, PredefinedMenuItem } from "@tauri-apps/api/menu";
 import { TrayIcon } from "@tauri-apps/api/tray";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import pkg from "@/package.json";
 import { setTheme } from "~/composables/theme";
 import useMainStore from "@/stores/index";
-import { resourceDir as getResourceDir, join } from "@tauri-apps/api/path";
+import { join } from "@tauri-apps/api/path";
 import { invoke } from "@tauri-apps/api/core";
 // import { ElConfirmPrimary } from "~/utils/element";
 import { open } from "@tauri-apps/plugin-shell";
@@ -22,7 +24,14 @@ async function toggleVisibility() {
 	}
 }
 
-export async function useTray(init: boolean = false, beforExit: Function, handleConnection: Function, handleReconnect: Function, handleNodesList: Function) {
+export async function useTray(
+	init: boolean = false,
+	beforExit: Function,
+	handleConnection: Function,
+	handleReconnect: Function,
+	handleNodesList: Function
+) {
+	if (!isTauri()) return null;
 	let tray;
 	try {
 		tray = await TrayIcon.getById(DEFAULT_TRAY_NAME);
@@ -124,7 +133,7 @@ export async function MenuItemTheme() {
 		text: "主题切换",
 		action: async () => {
 			const mainStore = useMainStore();
-			mainStore.$patch({ theme: !mainStore.theme });
+			mainStore.$patch({ theme: !mainStore.theme, themeMode: mainStore.theme ? "light" : "dark" });
 			// mainStore.$persist();
 			await setTheme(mainStore.theme);
 		}
@@ -144,10 +153,10 @@ export async function MenuItemTheme() {
 // }
 
 export async function setTrayRunState(tray: TrayIcon | null, isRunning: boolean = false) {
-	if (!tray) return;
+	if (!tray || !isWindows) return;
 	const resourceDir = await getResourceDir();
 	const path = await join(resourceDir, isRunning ? "easytier/icons/icon-inactive.ico" : "easytier/icons/icon.ico");
-	// "easytier/icons/icon-inactive.ico", { baseDir: BaseDirectory.Resource }
+	// "easytier/icons/icon-inactive.ico", { baseDir: dataBaseDir() }
 	await tray.setIcon(path);
 }
 
@@ -182,5 +191,5 @@ export const checkNewVersion = async () => {
 
 export const hasNewVersion = computed<boolean>(() => {
 	const mainStore = useMainStore();
-	return !!mainStore.latestTagName && versionDifference(pkg.version, mainStore.latestTagName) < 0 ;
+	return !!mainStore.latestTagName && versionDifference(pkg.version, mainStore.latestTagName) < 0;
 });

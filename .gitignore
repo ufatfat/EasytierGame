@@ -15,3 +15,14 @@ target
 src-tauri/easytier/logs
 src-tauri/easytier/tool/ResourcesExtract.exe
 src-tauri/easytier/tool/ResourcesExtract.cfg
+
+# Platform binaries prepared from the pinned upstream release
+src-tauri/easytier/easytier-core
+src-tauri/easytier/easytier-cli
+service/data/
+
+components.d.ts
+.vite
+
+# macOS Finder metadata
+.DS_Store

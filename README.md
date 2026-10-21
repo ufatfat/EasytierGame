@@ -2,7 +2,7 @@
 
 ## 简介
 
-EasyTierGame游戏联机启动器，由`nuxt3` `typescript` `rust` `tauri` 开发
+EasyTierGame游戏联机启动器，由`Vue 3 + Vite` `typescript` `rust` `tauri` 开发
 具有简易的界面，附带最新版easytier内核，联机游玩的时候无论是心理上和使用上都能给予您最舒服的体验，同时支持自定义配置文件启动，满足各种需求
 
 ## 下载
@@ -70,7 +70,13 @@ Releases： [https://github.com/EasyTier/EasytierGame/releases](https://github.c
 
 ## 系统支持
 
-支持Windows 11 、Windows 10 、 Windows 7
+支持 Windows 和 macOS（Apple Silicon / Intel）。
+
+新增全局固定 IP 登记和客户端公告，通过独立协调服务共享。构建、部署和使用说明见 [跨平台与全局服务](docs/PLATFORMS-AND-COMMUNITY.md)。
+
+Windows 专有增强工具和计划任务自启仅在 Windows 可用。
+
+前端使用 Vue 3 + Vite，保留 Tauri 桌面容器。开发运行 `pnpm dev` 或 `pnpm exec tauri dev`；迁移和日志/多窗口性能说明见 [验证记录](docs/VUE-VITE-PERFORMANCE.md)。
 
 ## 群聊交流
 - 主群 EasyTier 支持 

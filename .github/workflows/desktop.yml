@@ -1,0 +1,64 @@
+name: Desktop checks and packages
+on:
+    push:
+        branches: [main]
+    pull_request:
+    workflow_dispatch:
+permissions:
+    contents: read
+jobs:
+    desktop:
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - os: windows-latest
+                      artifact: windows-x64
+                    - os: macos-14
+                      artifact: macos-arm64
+                    - os: macos-15-intel
+                      artifact: macos-x64
+        runs-on: ${{ matrix.os }}
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: "24"
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 11.25.0
+            - uses: dtolnay/rust-toolchain@stable
+            - uses: Swatinem/rust-cache@v2
+              with:
+                  workspaces: src-tauri
+            - run: pnpm install --frozen-lockfile --ignore-scripts
+            - run: pnpm typecheck
+            - run: pnpm prepare:core
+              env:
+                  GITHUB_TOKEN: ${{ github.token }}
+            - run: pnpm test
+            - run: pnpm build
+            - run: cargo test --manifest-path src-tauri/Cargo.toml --locked
+            - if: runner.os == 'macOS'
+              run: pnpm exec tauri build --bundles app
+              env:
+                  APPLE_SIGNING_IDENTITY: "-"
+            - if: runner.os == 'Windows'
+              run: pnpm exec tauri build --no-bundle
+            - if: runner.os == 'Windows'
+              shell: pwsh
+              run: |
+                  Copy-Item src-tauri/easytier src-tauri/target/release/easytier -Recurse -Force
+                  Copy-Item src-tauri/帮助.txt src-tauri/target/release/帮助.txt
+                  Copy-Item src-tauri/uninstall.exe src-tauri/target/release/uninstall.exe
+                  pnpm release
+            - if: runner.os == 'macOS'
+              run: |
+                  mkdir -p release
+                  ditto -c -k --sequesterRsrc --keepParent src-tauri/target/release/bundle/macos/easytier-game.app release/easytier-game_${{ matrix.artifact }}.zip
+            - uses: actions/upload-artifact@v4
+              with:
+                  name: ${{ matrix.artifact }}
+                  path: |
+                      release/*.zip
+                  if-no-files-found: error

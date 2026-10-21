@@ -1,3 +1,4 @@
+import { isTauri } from "@tauri-apps/api/core";
 import { invoke } from "@tauri-apps/api/core";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { open } from "@tauri-apps/plugin-shell";
@@ -13,7 +14,7 @@ export const mixedArray = (a: Array<string>, b: Array<string>, split: string = "
 
 //防抖
 export const bounce = (time = 3000) => {
-	let bounceTimer: number | null = null;
+	let bounceTimer: ReturnType<typeof setTimeout> | null = null;
 	return (cb: Function) => {
 		bounceTimer && clearTimeout(bounceTimer);
 		bounceTimer = setTimeout(() => {
@@ -23,7 +24,7 @@ export const bounce = (time = 3000) => {
 };
 
 export const inputBounceRef = (value: string, cb?: Function, delay = 650) => {
-	let timeout: number | null = null;
+	let timeout: ReturnType<typeof setTimeout> | null = null;
 	return customRef((track, trigger) => {
 		return {
 			get() {
@@ -100,7 +101,7 @@ export const supportProtocols = () => {
 	return _supportProtocols.slice();
 };
 
-let _prevent_timer: number | null = null;
+let _prevent_timer: ReturnType<typeof setTimeout> | null = null;
 let _prevent_timer_count = 15; // 秒
 export const preventSleep = () => {
 	_prevent_timer && clearInterval(_prevent_timer);
@@ -197,12 +198,12 @@ export function isValidIP(ip: string) {
 }
 
 export const copyText = async (text: string, message: string = "复制成功") => {
-	const [err, _] = await ATJ(writeText(text));
+	const [err, _] = await ATJ(isTauri() ? writeText(text) : navigator.clipboard.writeText(text));
 
 	if (!err) {
 		ElMessage.success(message);
 	} else {
 		console.error(err);
-		ElMessage.success("复制失败");
+		ElMessage.error("复制失败");
 	}
 };

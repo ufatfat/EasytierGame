@@ -1,108 +1,124 @@
 <template>
-	<div class="relative flex h-full flex-col flex-wrap gap-[0] overflow-hidden">
-		<div class="flex h-[40px] w-full flex-nowrap items-center gap-[0_5px]">
-			<div class="ml-[5px] mr-auto flex flex-1">
-				<ElInput
-					size="small"
-					v-model="searchValue"
-					placeholder="请输入游戏名进行查询"
-				></ElInput>
-			</div>
-			<div>
-				<ElButton
-					:icon="Plus"
-					size="small"
-					type="primary"
-					class="mr-[5px]"
-					@click="handleCreate"
-				>
-					新增游戏
-				</ElButton>
-				<ElButton
-					size="small"
-					class="!ml-[0px] mr-[5px]"
-					@click="openCoverDir"
-				>
-					封面目录
-				</ElButton>
-			</div>
-		</div>
-		<div class="flex flex-1 flex-wrap gap-[0] overflow-auto">
-			<div
-				v-for="(item, idx) in computedGameList"
-				:key="item.id"
-				class="w-[25%] p-[4px]"
+	<section class="panel-window">
+		<PanelHeader
+			icon="gamepad-2"
+			title="游戏库"
+			subtitle="管理本地游戏，一键启动"
+		>
+			<button
+				class="ui-button primary"
+				@click="handleCreate"
 			>
-				<div class="group/card relative">
-					<ElCard>
-						<template #header>
-							<div class="flex flex-nowrap gap-[0_8px]">
-								<ElTooltip :content="item.name" placement="top">
-									<p class="ml-auto flex-1 truncate">
-										<ElText
-											size="default"
-											type="info"
-										>
-											{{ item.name }}
-										</ElText>
-									</p>
-								</ElTooltip>
-							</div>
-						</template>
+				<AppIcon
+					name="plus"
+					:size="14"
+				/>
+				添加游戏
+			</button>
+		</PanelHeader>
+		<div class="games-toolbar">
+			<label class="game-search">
+				<AppIcon
+					name="search"
+					:size="15"
+				/>
+				<input
+					v-model="searchValue"
+					placeholder="搜索游戏名称…"
+					aria-label="搜索游戏"
+				/>
+			</label>
+			<button
+				class="ui-button"
+				@click="openCoverDir"
+			>
+				<AppIcon
+					name="folder"
+					:size="14"
+				/>
+				封面目录
+			</button>
+		</div>
+		<div class="games-content panel-scroll">
+			<div class="games-grid">
+				<article
+					v-for="(item, idx) in computedGameList"
+					:key="item.id"
+					class="game-card surface-card"
+				>
+					<div class="game-cover">
 						<img
-							:src="showImgConvertFileSrc(item.showImg)"
+							v-if="coverFor(item)"
+							:src="coverFor(item) || undefined"
+							alt=""
 							@error="handleImgError(item, idx)"
-							class="aspect-[1] w-full object-cover"
 						/>
-					</ElCard>
-					<div
-						class="absolute left-0 top-[61px] z-[1] hidden h-[calc(100%-61px)] w-full flex-col items-center justify-center rounded-[5px] bg-[var(--el-mask-color)] group-hover/card:flex"
-					>
-						<ElButton
-							size="large"
-							type="success"
-							:icon="VideoPlay"
-							@click.stop="handleStartGame(item)"
-						>
-							启动游戏
-						</ElButton>
-						<div class="pt-[5px]">
-							<ElButton
-								size="small"
-								type="info"
-								:icon="EditPen"
-								title="修改"
-								@click.stop="handleEditItem(item)"
-							/>
-							<ElButton
-								size="small"
-								type="danger"
-								:icon="DeleteFilled"
-								title="删除"
-								@click.stop="handleDeleteItem(item)"
-							/>
+						<AppIcon
+							v-else
+							name="gamepad-2"
+							:size="40"
+						/>
+						<div class="game-overlay">
+							<button
+								class="ui-button primary"
+								@click="handleStartGame(item)"
+							>
+								<AppIcon
+									name="play"
+									:size="14"
+								/>
+								启动游戏
+							</button>
 						</div>
 					</div>
-				</div>
-			</div>
-
-			<div class="w-[25%] p-[4px]">
-				<ElTooltip content="新增本地游戏">
-					<ElCard
-						@click.stop="handleCreate"
-						shadow="hover"
-					>
-						<div class="group/plus flex cursor-pointer flex-col items-center justify-center py-[25px]">
-							<ElIcon class="!text-[80px] transition-all group-hover/plus:text-[color:var(--el-color-primary)]">
-								<Plus></Plus>
-							</ElIcon>
-							<div>
-								<ElText>支持从桌面拖放新增</ElText>
-							</div>
+					<div class="game-information">
+						<strong>{{ item.name }}</strong>
+						<div>
+							<span>本地游戏</span>
+							<button
+								class="icon-button"
+								aria-label="编辑游戏"
+								@click="handleEditItem(item)"
+							>
+								<AppIcon
+									name="pencil"
+									:size="13"
+								/>
+							</button>
+							<button
+								class="icon-button"
+								aria-label="删除游戏"
+								@click="handleDeleteItem(item)"
+							>
+								<AppIcon
+									name="trash-2"
+									:size="13"
+								/>
+							</button>
 						</div>
-					</ElCard>
-				</ElTooltip>
+					</div>
+				</article>
+				<button
+					class="add-game"
+					@click="handleCreate"
+				>
+					<span>
+						<AppIcon
+							name="plus"
+							:size="24"
+						/>
+					</span>
+					<strong>添加本地游戏</strong>
+					<small>{{ isWindows ? "支持从桌面拖放快捷方式" : "选择 Mac 上的应用或游戏" }}</small>
+				</button>
 			</div>
+			<p class="game-hint">
+				<AppIcon
+					name="info"
+					:size="13"
+				/>
+				游戏在本机启动，联机前请先进入相同房间
+			</p>
 		</div>
 		<ElDialog
 			width="95%"
@@ -189,13 +205,17 @@
 				</ElButton>
 			</template>
 		</ElDialog>
-	</div>
+	</section>
 </template>
 <script lang="ts" setup>
+	import AppIcon from "@/components/AppIcon.vue";
+	import PanelHeader from "@/components/PanelHeader.vue";
+	import { gameArtwork } from "@/composables/gameCatalog";
+	import { isWindows, dataBaseDir, getDataDir as getResourceDir, openFolder } from "@/composables/platform";
 	import { VideoPlay, DeleteFilled, EditPen, Plus, Delete } from "@element-plus/icons-vue";
 	import { dataSubscribe } from "~/composables/windows";
-	import { BaseDirectory, basename, extname, resourceDir as getResourceDir, join } from "@tauri-apps/api/path";
-	import { convertFileSrc, Resource } from "@tauri-apps/api/core";
+	import { BaseDirectory, basename, extname, join } from "@tauri-apps/api/path";
+	import { convertFileSrc, Resource, isTauri } from "@tauri-apps/api/core";
 	import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, useTemplateRef } from "vue";
 	import useMainStore from "@/stores/index";
 	import { uniqueId } from "lodash-es";
@@ -208,7 +228,7 @@
 	import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 	const resourceDir = await getResourceDir();
-	const gameListResourceDir = await join(resourceDir, import.meta.env.VITE_GAME_LIST_PATH);
+	const gameListResourceDir = isTauri() ? await join(resourceDir, import.meta.env.VITE_GAME_LIST_PATH) : "/";
 	// const defaultLocalIconPath = await join(configPath, "icon.png");
 	// const tauriPath = convertFileSrc(defaultLocalIconPath);
 	const mainStore = useMainStore();
@@ -252,10 +272,12 @@
 	};
 
 	const handleBrowser = async (type: "showImg" | "exePath") => {
-		const filters = type === "showImg" ? [{ name: "", extensions: ["png", "jpg", "jpeg"] }] : [{ name: "", extensions: ["exe"] }];
+		if (!isTauri()) return ElMessage.info("请在桌面客户端中选择本地文件");
+		const filters =
+			type === "showImg" ? [{ name: "", extensions: ["png", "jpg", "jpeg"] }] : [{ name: "", extensions: isWindows ? ["exe"] : ["app"] }];
 		const file = await dialogOpen({
 			multiple: false,
-			directory: false,
+			directory: type === "exePath" && !isWindows,
 			filters
 		});
 		if (file) {
@@ -267,10 +289,10 @@
 					}
 					let showImg = file;
 					const game_list_path = import.meta.env.VITE_GAME_LIST_PATH;
-					const isExists = await exists(game_list_path, { baseDir: BaseDirectory.Resource });
+					const isExists = await exists(game_list_path, { baseDir: dataBaseDir() });
 					if (!isExists) {
 						try {
-							await mkdir(game_list_path, { baseDir: BaseDirectory.Resource });
+							await mkdir(game_list_path, { baseDir: dataBaseDir() });
 						} catch (err) {}
 					}
 					const toPath = await join(gameListResourceDir, createGameData.form.id);
@@ -296,14 +318,15 @@
 	};
 
 	const openCoverDir = async () => {
+		if (!isTauri()) return ElMessage.info("请在桌面客户端中打开封面目录");
 		const game_list_path = import.meta.env.VITE_GAME_LIST_PATH;
-		const isExists = await exists(game_list_path, { baseDir: BaseDirectory.Resource });
+		const isExists = await exists(game_list_path, { baseDir: dataBaseDir() });
 		if (!isExists) {
 			try {
-				await mkdir(game_list_path, { baseDir: BaseDirectory.Resource });
+				await mkdir(game_list_path, { baseDir: dataBaseDir() });
 			} catch (err) {}
 		}
-		await Command.create("explorer", [gameListResourceDir]).execute();
+		await openFolder(gameListResourceDir);
 	};
 
 	const handleSave = async () => {
@@ -316,6 +339,7 @@
 				// await remove(imgPath);
 			}
 
+			if (!createGameData.form.id) createGameData.form.id = crypto.randomUUID();
 			const idx = mainStore.gameList.findIndex(i => i.id == createGameData.form.id);
 			if (idx >= 0) {
 				mainStore.gameList[idx] = { ...createGameData.form };
@@ -330,7 +354,7 @@
 
 			ElMessage.success("保存成功");
 			createGameData.visible = false;
-			// await Command.create("explorer", [gameListResourceDir]).execute();
+			// await openFolder(gameListResourceDir);
 		}
 	};
 
@@ -340,6 +364,7 @@
 	};
 
 	const removeFileById = async (id: string) => {
+		if (!isTauri()) return;
 		if (!id) return;
 		const isExists = await exists(gameListResourceDir);
 		if (!isExists) return;
@@ -375,6 +400,7 @@
 	};
 
 	const handleStartGame = async (item: gameItemType) => {
+		if (!isTauri()) return ElMessage.info("请在桌面客户端中启动本地游戏");
 		try {
 			const isExists = await exists(item.exePath);
 			if (!isExists) {
@@ -396,11 +422,12 @@
 		});
 	};
 
+	const coverFor = (item: gameItemType) => (item.showImg === defaultPng ? gameArtwork(item.name, true) : showImgConvertFileSrc(item.showImg));
 	const showImgConvertFileSrc = (showImg: string) => {
-		if (showImg == defaultPng) return defaultPng;
+		if (showImg == defaultPng || !isTauri()) return defaultPng;
 		showImg = /^[a-z]\:/g.test(showImg.toLowerCase())
 			? `${convertFileSrc(showImg)}?${new Date().getTime()}`
-			: `${convertFileSrc(`${gameListResourceDir}\\${showImg}`)}?${new Date().getTime()}`;
+			: `${convertFileSrc(`${gameListResourceDir}/${showImg}`)}?${new Date().getTime()}`;
 		return showImg;
 	};
 
@@ -423,6 +450,7 @@
 
 			if (lnkFiles.length > 0) {
 				// console.log(lnkFiles)
+				if (!isWindows) return ElMessage.warning("快捷方式导入仅支持 Windows，请使用添加游戏选择 macOS 应用");
 				let lnkFilesstr = "$lnkFiles = @(";
 				for (let i = 0; i < lnkFiles.length; i++) {
 					lnkFilesstr = lnkFilesstr + `\"${lnkFiles[i]}\"`;
@@ -502,32 +530,165 @@
 	// 兼容新的存储方式
 	const compatibleGameList = async () => {
 		const gameList = [...mainStore.gameList];
-		if(gameList.length <= 0) return;
+		if (gameList.length <= 0) return;
 		const newGameList = [];
-		for(const item of gameList) {
-			const newItem = {...item}
-			if(newItem.showImg != defaultPng && /^[a-z]\:/g.test(newItem.showImg.toLowerCase())) {
+		for (const item of gameList) {
+			const newItem = { ...item };
+			if (newItem.showImg != defaultPng && /^[a-z]\:/g.test(newItem.showImg.toLowerCase())) {
 				newItem.showImg = await basename(item.showImg);
-				if(Reflect.has(newItem, "coverImg")) {
-					delete newItem['coverImg'];
+				if (Reflect.has(newItem, "coverImg")) {
+					delete newItem["coverImg"];
 				}
 			}
 			newGameList.push(newItem);
 		}
 		mainStore.$patch({
 			gameList: newGameList
-		})
-	}
+		});
+	};
 
 	onMounted(async () => {
+		if (!isTauri()) return;
 		await compatibleGameList();
 		listenDragDrop(); //监听拖放
 	});
 
-	onBeforeUnmount(() =>{
+	onBeforeUnmount(() => {
 		unlistenDragDrop && unlistenDragDrop();
-	})
-
+	});
 
 	dataSubscribe();
 </script>
+
+<style scoped>
+	.games-toolbar {
+		display: flex;
+		gap: 8px;
+		align-items: center;
+		padding: 14px 20px;
+	}
+	.game-search {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		background: var(--surface-2);
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		height: 34px;
+		padding: 0 10px;
+		flex: 1;
+		color: var(--text-3);
+	}
+	.game-search input {
+		background: transparent;
+		border: 0;
+		outline: none;
+		font-size: 12px;
+		min-width: 0;
+		width: 100%;
+		color: var(--text-1);
+	}
+	.games-content {
+		padding: 0 20px 20px;
+	}
+	.games-grid {
+		display: grid;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		gap: 10px;
+	}
+	.game-card {
+		overflow: hidden;
+		min-width: 0;
+	}
+	.game-cover {
+		height: 150px;
+		background: var(--surface-3);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: var(--text-3);
+		position: relative;
+	}
+	.game-cover > img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+	.game-overlay {
+		position: absolute;
+		inset: 0;
+		background: #0006;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		opacity: 0;
+		transition: opacity 0.15s;
+	}
+	.game-card:hover .game-overlay,
+	.game-card:focus-within .game-overlay {
+		opacity: 1;
+	}
+	.game-information {
+		padding: 10px 12px;
+	}
+	.game-information strong {
+		font-size: 12px;
+		font-weight: 600;
+		display: block;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.game-information > div {
+		display: flex;
+		align-items: center;
+		margin-top: 3px;
+		font-size: 10px;
+		color: var(--text-3);
+	}
+	.game-information > div span {
+		flex: 1;
+	}
+	.game-information .icon-button {
+		width: 22px;
+		height: 22px;
+	}
+	.add-game {
+		border: 1px dashed var(--border);
+		border-radius: 10px;
+		min-height: 213px;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 9px;
+		background: transparent;
+		color: var(--text-3);
+	}
+	.add-game > span {
+		background: var(--surface-2);
+		border-radius: 50%;
+		padding: 12px;
+	}
+	.add-game strong {
+		font-size: 12px;
+		font-weight: 500;
+		color: var(--text-2);
+	}
+	.add-game small {
+		font-size: 10px;
+	}
+	.game-hint {
+		font-size: 10px;
+		color: var(--text-3);
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		margin-top: 16px;
+	}
+	@media (max-width: 480px) {
+		.games-grid {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+	}
+</style>
